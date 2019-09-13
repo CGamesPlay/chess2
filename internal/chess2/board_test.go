@@ -18,3 +18,12 @@ func TestSquareFromName(t *testing.T) {
 	require.Equal(t, "H8", SquareFromName("H8").String())
 	require.Equal(t, "H1", SquareFromName("H1").String())
 }
+
+func TestReplacePieces(t *testing.T) {
+	board, err := ParseFen(FenDefault)
+	require.NoError(t, err)
+	board.ReplacePieces(ColorBlack, TypePawn, TypeQueen)
+	expected := "rnbqkbnr/qqqqqqqq/8/8/8/8/PPPPPPPP/RNBQKBNR"
+	fen := EncodeFen(board)
+	require.Equal(t, expected, fen)
+}

@@ -9,6 +9,10 @@ type Square struct {
 	addr uint8
 }
 
+// InvalidSquare is not a real Square. It will cause undefined behavior if you
+// use it as anything other than a sentinel.
+var InvalidSquare = Square{127}
+
 // SquareFromCoords takes an x, y pair and returns a Square.
 func SquareFromCoords(x, y int) Square {
 	if x < 0 || x > 7 || y < 0 || y > 7 {
@@ -21,6 +25,9 @@ func SquareFromCoords(x, y int) Square {
 func SquareFromName(name string) Square {
 	x := name[0]
 	y := name[1]
+	if 'a' <= x && x <= 'h' {
+		x &= ^uint8(0x20)
+	}
 	if x < 'A' || x > 'H' || y < '1' || y > '8' || len(name) != 2 {
 		panic("Invalid Square name")
 	}
@@ -39,10 +46,18 @@ func (s Square) String() string {
 	return fmt.Sprintf("%c%d", x+'A', 8-y)
 }
 
+func pieceTypeIdx(p PieceType) int {
+	return int(p) - 1
+}
+
+func idxPieceType(idx int) PieceType {
+	return PieceType(idx + 1)
+}
+
 // Board represents the pieces on a chess board.
 type Board struct {
 	// Mask of where the pieces are
-	kings, queens, bishops, knights, rooks, pawns uint64
+	pieces [6]uint64
 	// Mask of which squares are occupied by which color
 	white, black uint64
 }
@@ -62,19 +77,11 @@ func (b *Board) PieceAt(s Square) (Piece, bool) {
 	} else {
 		color = ColorBlack
 	}
-	switch {
-	case b.kings&squareMask != 0:
-		pieceType = TypeKing
-	case b.queens&squareMask != 0:
-		pieceType = TypeQueen
-	case b.bishops&squareMask != 0:
-		pieceType = TypeBishop
-	case b.knights&squareMask != 0:
-		pieceType = TypeKnight
-	case b.rooks&squareMask != 0:
-		pieceType = TypeRook
-	case b.pawns&squareMask != 0:
-		pieceType = TypePawn
+	for i := range b.pieces {
+		if b.pieces[i]&squareMask != 0 {
+			pieceType = idxPieceType(i)
+			break
+		}
 	}
 	result := NewPiece(pieceType, ArmyNone, color)
 	return result, true
@@ -91,32 +98,33 @@ func (b *Board) SetPieceAt(s Square, p Piece) {
 	case ColorBlack:
 		b.black |= squareMask
 	}
-	switch p.Type() {
-	case TypeKing:
-		b.kings |= squareMask
-	case TypeQueen:
-		b.queens |= squareMask
-	case TypeBishop:
-		b.bishops |= squareMask
-	case TypeKnight:
-		b.knights |= squareMask
-	case TypeRook:
-		b.rooks |= squareMask
-	case TypePawn:
-		b.pawns |= squareMask
-	}
+	b.pieces[pieceTypeIdx(p.Type())] |= squareMask
 }
 
 // ClearPieceAt adjusts the receiver to have an empty square at the provided
 // space.
 func (b *Board) ClearPieceAt(s Square) {
 	squareMask := s.mask()
-	b.kings &= ^squareMask
-	b.queens &= ^squareMask
-	b.bishops &= ^squareMask
-	b.knights &= ^squareMask
-	b.rooks &= ^squareMask
-	b.pawns &= ^squareMask
+	for i := range b.pieces {
+		b.pieces[i] &= ^squareMask
+	}
 	b.white &= ^squareMask
 	b.black &= ^squareMask
+}
+
+// ReplacePieces modifies the board so that all pieces of the given color and
+// find type are replaced by a corresponding piece of the same color of the
+// replace type.
+func (b *Board) ReplacePieces(color Color, find, replace PieceType) {
+	var mask uint64
+	if color == ColorWhite {
+		mask = b.white
+	} else {
+		mask = b.black
+	}
+	idx := pieceTypeIdx(find)
+	mask &= b.pieces[idx]
+	b.pieces[idx] &= ^mask
+	idx = pieceTypeIdx(replace)
+	b.pieces[idx] |= mask
 }
