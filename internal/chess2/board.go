@@ -21,7 +21,8 @@ func SquareFromCoords(x, y int) Square {
 	return Square{addr: uint8(y*8 + x)}
 }
 
-// SquareFromName takes a name like A1 and returns a Square.
+// SquareFromName takes a name like A1 and returns a Square. Will return
+// InvalidSquare if the name is not valid.
 func SquareFromName(name string) Square {
 	x := name[0]
 	y := name[1]
@@ -29,7 +30,7 @@ func SquareFromName(name string) Square {
 		x &= ^uint8(0x20)
 	}
 	if x < 'A' || x > 'H' || y < '1' || y > '8' || len(name) != 2 {
-		panic("Invalid Square name")
+		return InvalidSquare
 	}
 	x = x - 'A'
 	y = '8' - y

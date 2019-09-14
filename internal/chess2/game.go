@@ -57,3 +57,7 @@ func GameFromArmies(white, black Army) Game {
 		epSquare:       InvalidSquare,
 	}
 }
+
+func (g Game) updateGameState() {
+	// TODO - decide if the game is over
+}

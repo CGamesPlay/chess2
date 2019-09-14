@@ -5,7 +5,12 @@ import (
 	"strings"
 )
 
-// EPD is: fen tomove castle epsquare hc fm armies stones operations
+// EpdError represents the error that was encountered when parsing a Fen
+type EpdError string
+
+func (msg EpdError) Error() string {
+	return string(msg)
+}
 
 func colorSymbol(c Color) rune {
 	if c == ColorWhite {
@@ -32,14 +37,32 @@ func castlingRights(sb *strings.Builder, rights uint64) {
 	}
 }
 
-var armySymbols = map[Army]rune{
-	ArmyClassic:   'c',
-	ArmyNemesis:   'n',
-	ArmyEmpowered: 'e',
-	ArmyReaper:    'r',
-	ArmyTwoKings:  'k',
-	ArmyAnimals:   'a',
-}
+var (
+	armyToSymbol = map[Army]rune{
+		ArmyClassic:   'c',
+		ArmyNemesis:   'n',
+		ArmyEmpowered: 'e',
+		ArmyReaper:    'r',
+		ArmyTwoKings:  'k',
+		ArmyAnimals:   'a',
+	}
+
+	symbolToArmy = map[rune]Army{
+		'c': ArmyClassic,
+		'n': ArmyNemesis,
+		'e': ArmyEmpowered,
+		'r': ArmyReaper,
+		'k': ArmyTwoKings,
+		'a': ArmyAnimals,
+	}
+
+	castlingCodes = map[rune]uint64{
+		'K': castleWhiteKingside,
+		'Q': castleWhiteQueenside,
+		'k': castleBlackKingside,
+		'q': castleBlackQueenside,
+	}
+)
 
 // EncodeEpd returns the EPD of the given game object
 func EncodeEpd(game Game) string {
@@ -59,8 +82,8 @@ func EncodeEpd(game Game) string {
 		" %d %d %c%c %d%d",
 		game.halfmoveClock,
 		game.fullmoveNumber+1,
-		armySymbols[game.armies[0]],
-		armySymbols[game.armies[1]],
+		armyToSymbol[game.armies[0]],
+		armyToSymbol[game.armies[1]],
 		game.stones[0],
 		game.stones[1],
 	))
@@ -68,7 +91,84 @@ func EncodeEpd(game Game) string {
 }
 
 // ParseEpd parses an EPD string and returns a Game object.
-func ParseEpd(epd string) Game {
-	result := Game{}
-	return result
+func ParseEpd(epd string) (Game, error) {
+	game := Game{}
+	// Split the EPD into components
+	var fenStr, castleStr, epStr string
+	var toMoveRune rune
+	var armyRunes, stoneRunes [2]rune
+	// EPD is: fen tomove castle epsquare hc fm armies stones operations
+	num, err := fmt.Sscanf(
+		epd, "%s %c %s %s %d %d %c%c %c%c",
+		&fenStr, &toMoveRune, &castleStr, &epStr,
+		&game.halfmoveClock, &game.fullmoveNumber,
+		&armyRunes[0], &armyRunes[1],
+		&stoneRunes[0], &stoneRunes[1],
+	)
+	if err != nil || num != 10 {
+		return Game{}, EpdError("EPD invalid")
+	}
+	board, err := ParseFen(fenStr)
+	if err != nil {
+		return Game{}, err
+	}
+	game.board = board
+
+	switch toMoveRune {
+	case 'w':
+		game.toMove = ColorWhite
+	case 'b':
+		game.toMove = ColorBlack
+	case 'K':
+		game.toMove = ColorWhite
+		game.kingTurn = true
+	case 'k':
+		game.toMove = ColorBlack
+		game.kingTurn = true
+	default:
+		return Game{}, EpdError("EPD has invalid to-move")
+	}
+
+	for symbol, value := range castlingCodes {
+		if strings.IndexRune(castleStr, symbol) != -1 {
+			game.castlingRights |= value
+		}
+	}
+
+	if epStr == "-" {
+		game.epSquare = InvalidSquare
+	} else {
+		game.epSquare = SquareFromName(epStr)
+		if game.epSquare == InvalidSquare {
+			return Game{}, EpdError("EPD has invalid en passant square")
+		}
+	}
+
+	// Adjust to be 0-based
+	game.fullmoveNumber--
+
+	for i, symbol := range armyRunes {
+		army, found := symbolToArmy[symbol]
+		if !found {
+			return Game{}, EpdError("EPD has invalid armies")
+		}
+		game.armies[i] = army
+	}
+
+	for i, stoneRune := range stoneRunes {
+		if stoneRune < '0' || stoneRune > '6' {
+			return Game{}, EpdError("EPD has invalid stones")
+		}
+		game.stones[i] = int(stoneRune - '0')
+	}
+
+	// Finally, some sanity checking
+	if game.kingTurn {
+		if game.armies[ColorIdx(game.toMove)] != ArmyTwoKings {
+			return Game{}, EpdError("King turn for army other than two kings")
+		}
+	}
+	game.updateGameState()
+
+	return game, nil
 }

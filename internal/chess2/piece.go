@@ -97,6 +97,22 @@ var (
 	}
 )
 
+// ColorIdx returns 0 for white, 1 for black
+func ColorIdx(color Color) int {
+	if color == ColorWhite {
+		return 0
+	}
+	return 1
+}
+
+// OtherColor returns black for white and vice versa
+func OtherColor(color Color) Color {
+	if color == ColorWhite {
+		return ColorBlack
+	}
+	return ColorWhite
+}
+
 func (t PieceType) String() string {
 	if name, found := basicTypeNames[t]; found {
 		return name
