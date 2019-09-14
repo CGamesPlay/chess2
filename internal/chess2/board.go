@@ -42,9 +42,12 @@ func (s Square) mask() uint64 {
 }
 
 func (s Square) String() string {
+	if s == InvalidSquare {
+		return "--"
+	}
 	x := s.addr % 8
 	y := s.addr / 8
-	return fmt.Sprintf("%c%d", x+'A', 8-y)
+	return fmt.Sprintf("%c%d", x+'a', 8-y)
 }
 
 func pieceTypeIdx(p PieceType) int {

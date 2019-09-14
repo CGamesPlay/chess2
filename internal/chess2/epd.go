@@ -5,10 +5,11 @@ import (
 	"strings"
 )
 
-// EpdError represents the error that was encountered when parsing a Fen
-type EpdError string
+// ParseError represents the error that was encountered when parsing a board or
+// move.
+type ParseError string
 
-func (msg EpdError) Error() string {
+func (msg ParseError) Error() string {
 	return string(msg)
 }
 
@@ -106,7 +107,7 @@ func ParseEpd(epd string) (Game, error) {
 		&stoneRunes[0], &stoneRunes[1],
 	)
 	if err != nil || num != 10 {
-		return Game{}, EpdError("EPD invalid")
+		return Game{}, ParseError("EPD invalid")
 	}
 	board, err := ParseFen(fenStr)
 	if err != nil {
@@ -126,7 +127,7 @@ func ParseEpd(epd string) (Game, error) {
 		game.toMove = ColorBlack
 		game.kingTurn = true
 	default:
-		return Game{}, EpdError("EPD has invalid to-move")
+		return Game{}, ParseError("EPD has invalid to-move")
 	}
 
 	for symbol, value := range castlingCodes {
@@ -140,7 +141,7 @@ func ParseEpd(epd string) (Game, error) {
 	} else {
 		game.epSquare = SquareFromName(epStr)
 		if game.epSquare == InvalidSquare {
-			return Game{}, EpdError("EPD has invalid en passant square")
+			return Game{}, ParseError("EPD has invalid en passant square")
 		}
 	}
 
@@ -150,14 +151,14 @@ func ParseEpd(epd string) (Game, error) {
 	for i, symbol := range armyRunes {
 		army, found := symbolToArmy[symbol]
 		if !found {
-			return Game{}, EpdError("EPD has invalid armies")
+			return Game{}, ParseError("EPD has invalid armies")
 		}
 		game.armies[i] = army
 	}
 
 	for i, stoneRune := range stoneRunes {
 		if stoneRune < '0' || stoneRune > '6' {
-			return Game{}, EpdError("EPD has invalid stones")
+			return Game{}, ParseError("EPD has invalid stones")
 		}
 		game.stones[i] = int(stoneRune - '0')
 	}
@@ -165,7 +166,7 @@ func ParseEpd(epd string) (Game, error) {
 	// Finally, some sanity checking
 	if game.kingTurn {
 		if game.armies[ColorIdx(game.toMove)] != ArmyTwoKings {
-			return Game{}, EpdError("King turn for army other than two kings")
+			return Game{}, ParseError("King turn for army other than two kings")
 		}
 	}
 	game.updateGameState()

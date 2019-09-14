@@ -45,7 +45,7 @@ func ParseFenPiece(code rune) (Piece, error) {
 		}
 		return NewPiece(resultType, ArmyClassic, color), nil
 	}
-	return Piece{}, EpdError(fmt.Sprintf("Invalid piece in FEN: '%s'", string(code)))
+	return Piece{}, ParseError(fmt.Sprintf("Invalid piece in FEN: '%s'", string(code)))
 }
 
 // EncodeFenPiece returns the FEN code for a specific piece
@@ -69,10 +69,10 @@ func ParseFen(fen string) (Board, error) {
 			x = 0
 			y++
 			if y >= 8 {
-				return Board{}, EpdError(fmt.Sprintf("FEN has too many ranks"))
+				return Board{}, ParseError(fmt.Sprintf("FEN has too many ranks"))
 			}
 		case x >= 8:
-			return Board{}, EpdError(fmt.Sprintf("Rank in FEN is too long"))
+			return Board{}, ParseError(fmt.Sprintf("Rank in FEN is too long"))
 		case '1' <= op && op <= '8':
 			x += int(op - '0')
 		default:

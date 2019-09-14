@@ -14,6 +14,8 @@ type (
 )
 
 const (
+	// TypeNone is not a real piece
+	TypeNone = PieceType(0x00)
 	// TypeKing means a king
 	TypeKing = PieceType(0x01)
 	// TypeQueen means a queen
@@ -59,6 +61,7 @@ type Piece struct {
 
 var (
 	basicTypeNames = map[PieceType]string{
+		TypeNone:   "nothing",
 		TypeKing:   "king",
 		TypeQueen:  "queen",
 		TypeBishop: "bishop",
@@ -96,6 +99,9 @@ var (
 		uint8(ArmyAnimals) | uint8(TypeRook):     "Elephant",
 	}
 )
+
+// InvalidPiece is the default value for Piece. It represents "no piece".
+var InvalidPiece = Piece{}
 
 // ColorIdx returns 0 for white, 1 for black
 func ColorIdx(color Color) int {
