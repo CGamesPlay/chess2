@@ -80,13 +80,6 @@ func (s Square) String() string {
 	return fmt.Sprintf("%c%d", s.X()+'a', 8-s.Y())
 }
 
-func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
 // SquareDistance calculates the greater of the horizontal or vertical distance
 // between the squares.
 func SquareDistance(a, b Square) int {
@@ -114,15 +107,10 @@ type Board struct {
 	colors [2]uint64
 }
 
-// PieceAt is like ArmyPieceAt, but without setting a specific Army on the
-// resulting Piece.
+// PieceAt returns the piece at the given square in the receiver, and a
+// boolean indicating whether the square is occupied. The returned piece will
+// always have ArmyNone as the Army.
 func (b *Board) PieceAt(s Square) (Piece, bool) {
-	return b.ArmyPieceAt(s, ArmyNone)
-}
-
-// ArmyPieceAt returns the piece at the given square in the receiver, and a
-// boolean indicating whether the square is occupied
-func (b *Board) ArmyPieceAt(s Square, army Army) (Piece, bool) {
 	squareMask := s.Mask()
 	var (
 		color     Color
@@ -141,7 +129,7 @@ func (b *Board) ArmyPieceAt(s Square, army Army) (Piece, bool) {
 			break
 		}
 	}
-	result := NewPiece(pieceType, army, color)
+	result := NewPiece(pieceType, ArmyNone, color)
 	return result, true
 }
 

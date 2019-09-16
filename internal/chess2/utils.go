@@ -33,3 +33,10 @@ func eachBitSubset64(mask uint64, f func(subset uint64)) {
 		}
 	}
 }
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}

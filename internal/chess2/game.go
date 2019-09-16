@@ -110,7 +110,57 @@ var (
 	// square, and attackable given a particular occupancy mask.
 	diagMask, diagAttackMask = buildAttackTable([]int{-9, -7, 7, 9})
 	orthMask, orthAttackMask = buildAttackTable([]int{-8, -1, 1, 8})
+
+	// Masks describing the files that have to be empty for a castle.
+	queensideMask = uint64(0x0e0e0e0e0e0e0e0e)
+	kingsideMask  = uint64(0x6060606060606060)
 )
+
+func buildBetweenMask() (results [64][64]uint64) {
+	for a := 0; a < 64; a++ {
+		maskA := uint64(1 << a)
+		for b := 0; b < 64; b++ {
+			maskB := uint64(1 << b)
+			if diagMask[a]&maskB != 0 {
+				results[a][b] = diagAttackMask[a][maskB] & diagAttackMask[b][maskA]
+			} else if orthMask[a]&maskB != 0 {
+				results[a][b] = orthAttackMask[a][maskB] & orthAttackMask[b][maskA]
+			}
+		}
+	}
+	return
+}
+
+// The set of squares that are between the two addresses, exclusively.
+var betweenMask = buildBetweenMask()
+
+func singleStepMask(from Square, toMask uint64) uint64 {
+	mask := MaskEmpty
+	eachSquareInMask(toMask, func(to Square) {
+		dx, dy := to.X()-from.X(), to.Y()-from.Y()
+		if dx < 0 {
+			mask |= 1 << (from.Address - 1)
+			if dy < 0 {
+				mask |= 1 << (from.Address - 9)
+			} else if dy > 0 {
+				mask |= 1 << (from.Address + 7)
+			}
+		} else if dx > 0 {
+			mask |= 1 << (from.Address + 1)
+			if dy < 0 {
+				mask |= 1 << (from.Address - 7)
+			} else if dy > 0 {
+				mask |= 1 << (from.Address + 9)
+			}
+		}
+		if dy < 0 {
+			mask |= 1 << (from.Address - 8)
+		} else if dy > 0 {
+			mask |= 1 << (from.Address + 8)
+		}
+	})
+	return mask
+}
 
 // A Game fully describes a Chess 2 game.
 type Game struct {
@@ -161,13 +211,8 @@ func (g *Game) GeneratePseudoLegalMoves() []Move {
 	return results
 }
 
-// A move is "pseudo-legal" if it follows the distance and direction rules for
-// the piece moved; all intermediate squares are empty (except for jump moves)
-// or capturable (for the Elephant's rampage); and the target square is empty or
-// contains a capturable piece. Additionally:
-//  - A move that captures one of the player's own kings is not pseudo-legal.
-//  - A pass move is pseudo-legal during a king turn.
 func (g *Game) generatePseudoLegalMoves(send func(Move)) {
+
 	fromMask := g.board.colorMask(g.toMove)
 	eachSquareInMask(fromMask, func(from Square) {
 		mask := g.attackMask(from)
@@ -175,6 +220,162 @@ func (g *Game) generatePseudoLegalMoves(send func(Move)) {
 			send(Move{From: from, To: to})
 		})
 	})
+}
+
+// ValidatePseudoLegalMove returns an error describing why the given move is not
+// pseudo-legal.
+//
+// A move is "pseudo-legal" if it follows the distance and direction rules for
+// the piece moved; all intermediate squares are empty (except for jump moves)
+// or capturable (for the Elephant's rampage); and the target square is empty or
+// contains a capturable piece. Additionally:
+//  - A move that captures one of the player's own kings is not pseudo-legal.
+//  - A pass move is pseudo-legal during a king turn.
+func (g *Game) ValidatePseudoLegalMove(move Move) error {
+	// Basic checks
+	if g.gameState != GameInProgress {
+		return GameOverError
+	} else if move.IsDrop() {
+		return IllegalDropError
+	} else if move.IsPass() && !g.kingTurn {
+		return IllegalPassError
+	}
+
+	// Check turn
+	piece, found := g.board.PieceAt(move.From)
+	piece = piece.WithArmy(g.armies[ColorIdx(piece.Color())])
+	if !found || piece.Color() != g.toMove {
+		return NotMovablePieceError
+	} else if g.kingTurn && piece.Type() != TypeKing {
+		return IllegalKingTurnError
+	}
+
+	// Check promotions
+	lastRank := MaskRank[7*ColorIdx(piece.Color())]
+	if move.Piece != InvalidPiece {
+		if piece.Type() != TypePawn ||
+			move.To.Mask()&lastRank == 0 ||
+			move.Piece.Type() == TypePawn ||
+			move.Piece.Type() == TypeKing {
+			return IllegalPromotionError
+		}
+	} else if piece.Type() == TypePawn && move.To.Mask()&lastRank != 0 {
+		// Pawns must promote at last rank
+		return IllegalPromotionError
+	}
+
+	// Check noncapturing pawn moves
+	if piece.Type() == TypePawn {
+		diff := int(move.To.Address) - int(move.From.Address)
+		sign := ColorIdx(piece.Color())*2 - 1
+		forwardDiff := sign * diff
+		_, targetOccupied := g.board.PieceAt(move.To)
+		if forwardDiff < 0 && piece.Army() != ArmyNemesis {
+			return UnreachableSquareError
+		} else if forwardDiff == 8 {
+			if targetOccupied {
+				return IllegalCaptureError
+			}
+			return nil
+		} else if forwardDiff == 16 && piece.Army() != ArmyNemesis {
+			// targetRank = 4 for white, 3 for black
+			targetRank := 4 - ColorIdx(piece.Color())
+			middleOccupied := betweenMask[move.From.Address][move.To.Address]&g.board.occupiedMask() != 0
+			if middleOccupied || move.To.Y() != targetRank {
+				return UnreachableSquareError
+			} else if targetOccupied {
+				return IllegalCaptureError
+			}
+			return nil
+		} else if forwardDiff == 7 || forwardDiff == 9 {
+			if SquareDistance(move.From, move.To) > 1 {
+				return UnreachableSquareError
+			} else if move.To == g.epSquare {
+				return nil
+			}
+		} else if piece.Army() == ArmyNemesis {
+			// Check for nemesis move
+			mask := singleStepMask(move.From, g.board.pieceMask(TypeKing)&g.board.colorMask(OtherColor(piece.Color())))
+			if move.To.Mask()&mask == 0 {
+				return UnreachableSquareError
+			} else if targetOccupied {
+				return IllegalCaptureError
+			}
+			return nil
+		}
+		// Otherwise normal sliding attack rules apply
+	}
+
+	// Check castling
+	if piece.Type() == TypeKing {
+		diff := int(move.To.Address) - int(move.From.Address)
+		if diff == 2 || diff == -2 {
+			if piece.Name() != PieceNameClassicKing ||
+				g.castlingRights&requiredCastlingRight(piece.Color(), diff < 0) == 0 {
+				return IllegalCastleError
+			}
+			firstRank := MaskRank[7-7*ColorIdx(piece.Color())]
+			if diff < 0 {
+				firstRank &= queensideMask
+			} else {
+				firstRank &= kingsideMask
+			}
+			if g.board.occupiedMask()&firstRank != 0 {
+				return IllegalCastleError
+			}
+			return nil
+		}
+		// Otherwise normal sliding attack rules apply
+	}
+
+	// Check whirlwind attack
+	if move.From == move.To {
+		if piece.Name() != PieceNameTwoKingsKing || !g.kingTurn {
+			return IllegalWhirlwindAttackError
+		}
+		attackedKings := g.board.pieceMask(TypeKing) & g.board.colorMask(piece.Color()) & dist1Mask[move.From.Address]
+		if attackedKings != 0 {
+			return IllegalCaptureError
+		}
+		return nil
+	}
+
+	// Check valid sliding attack
+	if g.attackMask(move.From)&move.To.Mask() == 0 {
+		return UnreachableSquareError
+	}
+
+	// Check captures
+	noncapturableMask := MaskEmpty
+	if piece.Name() == PieceNameAnimalsKnight {
+		// Cannot capture own king
+		noncapturableMask |= g.board.colorMask(piece.Color()) & g.board.pieceMask(TypeKing)
+	} else if piece.Name() != PieceNameAnimalsRook {
+		// Cannot capture own pieces
+		noncapturableMask |= g.board.colorMask(piece.Color())
+	}
+	for colorIdx := 0; colorIdx < 2; colorIdx++ {
+		army := g.armies[colorIdx]
+		colorPieces := g.board.colors[colorIdx]
+		if piece.Type() != TypeKing && army == ArmyNemesis {
+			// Cannot capture nemesis queen
+			noncapturableMask |= colorPieces & g.board.pieceMask(TypeQueen)
+		}
+		if army == ArmyNemesis {
+			// Cannot capture nemesis rook
+			noncapturableMask |= colorPieces & g.board.pieceMask(TypeRook)
+		}
+		if army == ArmyAnimals {
+			// Cannot capture elephants more than 3 spaces away
+			noncapturableMask |= colorPieces & g.board.pieceMask(TypeRook) & ^dist2Mask[move.From.Address]
+		}
+	}
+	attemptedCapturesMask := betweenMask[move.From.Address][move.To.Address] | move.To.Mask()
+	if attemptedCapturesMask&noncapturableMask != 0 {
+		return IllegalCaptureError
+	}
+
+	return nil
 }
 
 // attackMask returns the mask of threatened squares from the given square.
@@ -252,7 +453,6 @@ func (g *Game) attackMask(from Square) uint64 {
 	default:
 		panic("Invalid piece type")
 	}
-
 }
 
 // Given a mask, call the function for each Square set in the mask.
@@ -262,4 +462,20 @@ func eachSquareInMask(mask uint64, f func(Square)) {
 		f(Square{Address: lsb})
 		mask &^= 1 << lsb
 	}
+}
+
+func requiredCastlingRight(color Color, isQueenside bool) uint64 {
+	switch color {
+	case ColorWhite:
+		if isQueenside {
+			return castleWhiteQueenside
+		}
+		return castleWhiteKingside
+	case ColorBlack:
+		if isQueenside {
+			return castleBlackQueenside
+		}
+		return castleBlackKingside
+	}
+	return 0
 }

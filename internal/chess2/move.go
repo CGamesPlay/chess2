@@ -209,7 +209,7 @@ func ParseUci(uci string) (Move, error) {
 				}
 			}
 		}
-		if move.From != InvalidSquare && move.To != InvalidSquare && move.Piece.Type() != TypePawn {
+		if move.From != InvalidSquare && move.To != InvalidSquare && move.Piece.Type() != TypePawn && move.Piece.Type() != TypeKing {
 			return move, nil
 		}
 	} else if reDropMove.MatchString(uci) {

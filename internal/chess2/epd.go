@@ -5,14 +5,6 @@ import (
 	"strings"
 )
 
-// ParseError represents the error that was encountered when parsing a board or
-// move.
-type ParseError string
-
-func (msg ParseError) Error() string {
-	return string(msg)
-}
-
 func colorSymbol(c Color) rune {
 	if c == ColorWhite {
 		return 'w'
