@@ -216,18 +216,22 @@ func TestAttackMask(t *testing.T) {
 	}
 }
 
-type PseudoLegalMoveTest struct {
+type ValidateMoveTest struct {
 	epd  string
 	move string
 	err  error
 }
 
-func TestIsPseudoLegalMove(t *testing.T) {
-	cases := map[string]PseudoLegalMoveTest{
+func TestValidatePseudoLegalMove(t *testing.T) {
+	cases := map[string]ValidateMoveTest{
 		"illegal pass": {
 			epd:  "4k3/8/8/8/8/8/8/4K3 b - - 0 1 nn 33",
 			move: "0000",
 			err:  IllegalPassError,
+		},
+		"legal pass": {
+			epd:  "4k3/8/8/8/8/8/8/4K3 K - - 0 1 kn 33",
+			move: "0000",
 		},
 		"illegal drop": {
 			epd:  "4k3/8/8/8/8/8/8/4K3 b - - 0 1 nn 33",
@@ -398,6 +402,15 @@ func TestIsPseudoLegalMove(t *testing.T) {
 			epd:  "4k3/8/8/8/8/8/8/R3K3 w KQkq - 0 1 cn 33",
 			move: "e1c1",
 		},
+		"elephant rampage": {
+			epd:  "4k3/8/8/8/RnpP4/8/8/4K3 w KQkq - 0 1 ac 33",
+			move: "a4d4",
+		},
+		"illegal elephant capture": {
+			epd:  "4k3/8/8/8/Rn6/8/8/4K3 w KQkq - 0 1 ac 33",
+			move: "a4b4",
+			err:  IllegalRampageError,
+		},
 	}
 	for name, config := range cases {
 		game, err := ParseEpd(config.epd)
@@ -410,5 +423,76 @@ func TestIsPseudoLegalMove(t *testing.T) {
 		} else {
 			assert.NoError(t, err, "Case: %s", name)
 		}
+	}
+}
+
+/*
+func TestValidateDuels(t *testing.T) {
+	cases := map[string]ValidateMoveTest{
+		"legal duel": {
+			epd:  "4k3/8/8/4p3/3P4/8/8/4K3 w - - 0 1 cc 33",
+			move: "d4d5:22",
+		},
+	}
+	for name, config := range cases {
+		game, err := ParseEpd(config.epd)
+		require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
+		move, err := ParseUci(config.move)
+		require.NoError(t, err, "Move: %s  Name: %s", config.move, name)
+		err = game.ValidateDuels(move)
+		if config.err != nil {
+			assert.EqualError(t, err, config.err.Error(), "Case: %s", name)
+		} else {
+			assert.NoError(t, err, "Case: %s", name)
+		}
+	}
+}
+*/
+
+func TestApplyMove(t *testing.T) {
+	cases := map[string]struct {
+		before string
+		move   string
+		after  string
+	}{
+		"drop": {
+			before: "8/8/8/8/8/8/8/8 w KQkq - 0 1 nk 33",
+			move:   "K@e1",
+			after:  "8/8/8/8/8/8/8/4K3 w KQkq - 0 1 nk 33",
+		},
+		"pass without two kings": {
+			before: "8/8/8/8/8/8/8/8 w KQkq - 0 1 nk 33",
+			move:   "0000",
+			after:  "8/8/8/8/8/8/8/8 b KQkq - 0 1 nk 33",
+		},
+		"pass with two kings": {
+			before: "8/8/8/8/8/8/8/8 w KQkq - 0 1 ka 33",
+			move:   "0000",
+			after:  "8/8/8/8/8/8/8/8 K KQkq - 0 1 ka 33",
+		},
+		"pass on king-turn": {
+			before: "8/8/8/8/8/8/8/8 K KQkq - 0 1 ka 33",
+			move:   "0000",
+			after:  "8/8/8/8/8/8/8/8 b KQkq - 0 1 ka 33",
+		},
+		"normal move": {
+			before: "4k3/8/8/8/8/8/8/4K3 w KQkq - 0 1 cc 33",
+			move:   "e1e2",
+			after:  "4k3/8/8/8/8/8/4K3/8 b KQkq - 0 1 cc 33",
+		},
+		"capturing move": {
+			before: "4k3/8/8/8/8/8/4b3/4K3 w KQkq - 0 1 cc 33",
+			move:   "e1e2",
+			after:  "4k3/8/8/8/8/8/4K3/8 b KQkq - 0 1 cc 33",
+		},
+	}
+	for name, config := range cases {
+		before, err := ParseEpd(config.before)
+		require.NoError(t, err, "EPD: %s  Name: %s", config.before, name)
+		move, err := ParseUci(config.move)
+		require.NoError(t, err, "Move: %s  Name: %s", config.move, name)
+		after := before.ApplyMove(move)
+		result := EncodeEpd(after)
+		assert.Equal(t, config.after, result, "Case: %s", name)
 	}
 }

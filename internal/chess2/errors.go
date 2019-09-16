@@ -29,6 +29,9 @@ const (
 	UnreachableSquareError
 	// IllegalCaptureError is a move that looks like a capture but isn't valid.
 	IllegalCaptureError
+	// IllegalRampageError is any Elephant move that captures and doesn't follow
+	// the rampage rules.
+	IllegalRampageError
 )
 
 func (code IllegalMoveError) Error() string {
@@ -53,6 +56,8 @@ func (code IllegalMoveError) Error() string {
 		return "unreachable square"
 	case IllegalCaptureError:
 		return "illegal capture"
+	case IllegalRampageError:
+		return "illegal rampage"
 	default:
 		panic("invalid error code")
 	}

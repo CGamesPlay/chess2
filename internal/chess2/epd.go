@@ -5,9 +5,15 @@ import (
 	"strings"
 )
 
-func colorSymbol(c Color) rune {
+func toMoveSymbol(c Color, kingTurn bool) rune {
 	if c == ColorWhite {
+		if kingTurn {
+			return 'K'
+		}
 		return 'w'
+	}
+	if kingTurn {
+		return 'k'
 	}
 	return 'b'
 }
@@ -62,7 +68,7 @@ func EncodeEpd(game Game) string {
 	var sb strings.Builder
 	sb.WriteString(EncodeFen(game.board))
 	sb.WriteRune(' ')
-	sb.WriteRune(colorSymbol(game.toMove))
+	sb.WriteRune(toMoveSymbol(game.toMove, game.kingTurn))
 	sb.WriteRune(' ')
 	castlingRights(&sb, game.castlingRights)
 	sb.WriteRune(' ')

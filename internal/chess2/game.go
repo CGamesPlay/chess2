@@ -222,23 +222,59 @@ func (g *Game) generatePseudoLegalMoves(send func(Move)) {
 	})
 }
 
+// ApplyMove clones the receiver, applies the given move to the clone, and
+// returns the clone. It does not validate that the move is legal, and if an
+// illegal move is made the resulting Game may not be in a valid state.
+func (g *Game) ApplyMove(move Move) Game {
+	return applyMoveTo(g, move)
+}
+
+func applyMoveTo(old *Game, move Move) Game {
+	g := *old
+	if move.IsDrop() {
+		p := move.Piece.WithArmy(g.armies[ColorIdx(move.Piece.Color())])
+		g.board.SetPieceAt(move.To, p)
+		return g
+	}
+
+	// Advance turn
+	if g.armies[ColorIdx(g.toMove)] == ArmyTwoKings && !g.kingTurn {
+		g.kingTurn = true
+	} else {
+		g.kingTurn = false
+		g.toMove = OtherColor(g.toMove)
+	}
+
+	if move.IsPass() {
+		return g
+	}
+
+	p, _ := g.board.PieceAt(move.From)
+	g.board.ClearPieceAt(move.From)
+	g.board.SetPieceAt(move.To, p)
+
+	return g
+}
+
 // ValidatePseudoLegalMove returns an error describing why the given move is not
 // pseudo-legal.
 //
-// A move is "pseudo-legal" if it follows the distance and direction rules for
-// the piece moved; all intermediate squares are empty (except for jump moves)
-// or capturable (for the Elephant's rampage); and the target square is empty or
-// contains a capturable piece. Additionally:
-//  - A move that captures one of the player's own kings is not pseudo-legal.
-//  - A pass move is pseudo-legal during a king turn.
+// A move is "pseudo-legal" if it is one of the player to move's pieces; follows
+// the distance and direction rules for the piece moved; all intermediate
+// squares are empty (except for jump moves) or capturable (for the Elephant's
+// rampage); and the target square is empty or contains a capturable piece.
+// Additionally, a pass move is pseudo-legal during a king turn.
 func (g *Game) ValidatePseudoLegalMove(move Move) error {
 	// Basic checks
 	if g.gameState != GameInProgress {
 		return GameOverError
 	} else if move.IsDrop() {
 		return IllegalDropError
-	} else if move.IsPass() && !g.kingTurn {
-		return IllegalPassError
+	} else if move.IsPass() {
+		if !g.kingTurn {
+			return IllegalPassError
+		}
+		return nil
 	}
 
 	// Check turn
@@ -371,8 +407,14 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 		}
 	}
 	attemptedCapturesMask := betweenMask[move.From.Address][move.To.Address] | move.To.Mask()
-	if attemptedCapturesMask&noncapturableMask != 0 {
+	if piece.Name() != PieceNameAnimalsRook && attemptedCapturesMask&noncapturableMask != 0 {
 		return IllegalCaptureError
+	}
+
+	if piece.Name() == PieceNameAnimalsRook &&
+		attemptedCapturesMask != 0 &&
+		SquareDistance(move.From, move.To) != 3 {
+		return IllegalRampageError
 	}
 
 	return nil
@@ -448,11 +490,17 @@ func (g *Game) attackMask(from Square) uint64 {
 		diag := diagMask[from.Address] & g.board.occupiedMask()
 		return diagAttackMask[from.Address][diag] & dist2Mask[from.Address]
 	case PieceNameAnimalsRook:
-		orth := orthMask[from.Address] & g.board.occupiedMask()
-		return orthAttackMask[from.Address][orth] & dist3Mask[from.Address]
+		return orthAttackMask[from.Address][0] & dist3Mask[from.Address]
 	default:
 		panic("Invalid piece type")
 	}
+}
+
+// ValidateDuels returns an error describing why the duels on given move are not
+// legal.
+func (g *Game) ValidateDuels(move Move) error {
+	// Check number of duels
+	panic("not implemented")
 }
 
 // Given a mask, call the function for each Square set in the mask.
