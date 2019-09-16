@@ -11,6 +11,8 @@ type (
 	Army int
 	// Color is White or Black
 	Color int
+	// PieceName is a combination of PieceType and Army
+	PieceName int
 )
 
 const (
@@ -46,6 +48,48 @@ const (
 	ColorWhite = Color(0x00)
 	// ColorBlack means black
 	ColorBlack = Color(0x80)
+	// PieceNameNone is not a real piece
+	PieceNameNone = PieceName(0x00)
+	// PieceNameBasicKing means a king
+	PieceNameBasicKing = PieceName(0x01)
+	// PieceNameBasicQueen means a queen
+	PieceNameBasicQueen = PieceName(0x02)
+	// PieceNameBasicBishop means a bishop
+	PieceNameBasicBishop = PieceName(0x03)
+	// PieceNameBasicKnight means a knight
+	PieceNameBasicKnight = PieceName(0x04)
+	// PieceNameBasicRook means a rook
+	PieceNameBasicRook = PieceName(0x05)
+	// PieceNameBasicPawn means a pawn
+	PieceNameBasicPawn = PieceName(0x06)
+	// PieceNameClassicKing means Classic King
+	PieceNameClassicKing = PieceName(int(ArmyClassic) | int(TypeKing))
+	// PieceNameNemesisQueen means Nemesis
+	PieceNameNemesisQueen = PieceName(int(ArmyNemesis) | int(TypeQueen))
+	// PieceNameNemesisPawn means Nemesis Pawn
+	PieceNameNemesisPawn = PieceName(int(ArmyNemesis) | int(TypePawn))
+	// PieceNameEmpoweredQueen means Abdicated Queen
+	PieceNameEmpoweredQueen = PieceName(int(ArmyEmpowered) | int(TypeQueen))
+	// PieceNameEmpoweredBishop means Empowered Bishop
+	PieceNameEmpoweredBishop = PieceName(int(ArmyEmpowered) | int(TypeBishop))
+	// PieceNameEmpoweredKnight means Empowered Knight
+	PieceNameEmpoweredKnight = PieceName(int(ArmyEmpowered) | int(TypeKnight))
+	// PieceNameEmpoweredRook means Empowered Rook
+	PieceNameEmpoweredRook = PieceName(int(ArmyEmpowered) | int(TypeRook))
+	// PieceNameReaperQueen means Reaper
+	PieceNameReaperQueen = PieceName(int(ArmyReaper) | int(TypeQueen))
+	// PieceNameReaperRook means Ghost
+	PieceNameReaperRook = PieceName(int(ArmyReaper) | int(TypeRook))
+	// PieceNameTwoKingsKing means Warrior King
+	PieceNameTwoKingsKing = PieceName(int(ArmyTwoKings) | int(TypeKing))
+	// PieceNameAnimalsQueen means Jungle Queen
+	PieceNameAnimalsQueen = PieceName(int(ArmyAnimals) | int(TypeQueen))
+	// PieceNameAnimalsBishop means Tiger
+	PieceNameAnimalsBishop = PieceName(int(ArmyAnimals) | int(TypeBishop))
+	// PieceNameAnimalsKnight means Wild Horse
+	PieceNameAnimalsKnight = PieceName(int(ArmyAnimals) | int(TypeKnight))
+	// PieceNameAnimalsRook means Elephant
+	PieceNameAnimalsRook = PieceName(int(ArmyAnimals) | int(TypeRook))
 )
 
 const (
@@ -82,21 +126,21 @@ var (
 		ColorWhite: "white",
 		ColorBlack: "black",
 	}
-	pieceNames = map[uint8]string{
-		uint8(ArmyClassic) | uint8(TypeKing):     "Classic King",
-		uint8(ArmyNemesis) | uint8(TypeQueen):    "Nemesis",
-		uint8(ArmyNemesis) | uint8(TypePawn):     "Nemesis Pawn",
-		uint8(ArmyEmpowered) | uint8(TypeQueen):  "Abdicated Queen",
-		uint8(ArmyEmpowered) | uint8(TypeBishop): "Empowered Bishop",
-		uint8(ArmyEmpowered) | uint8(TypeKnight): "Empowered Knight",
-		uint8(ArmyEmpowered) | uint8(TypeRook):   "Empowered Rook",
-		uint8(ArmyReaper) | uint8(TypeQueen):     "Reaper",
-		uint8(ArmyReaper) | uint8(TypeRook):      "Ghost",
-		uint8(ArmyTwoKings) | uint8(TypeKing):    "Warrior King",
-		uint8(ArmyAnimals) | uint8(TypeQueen):    "Jungle Queen",
-		uint8(ArmyAnimals) | uint8(TypeBishop):   "Tiger",
-		uint8(ArmyAnimals) | uint8(TypeKnight):   "Wild Horse",
-		uint8(ArmyAnimals) | uint8(TypeRook):     "Elephant",
+	pieceNames = map[PieceName]string{
+		PieceNameClassicKing:     "Classic King",
+		PieceNameNemesisQueen:    "Nemesis",
+		PieceNameNemesisPawn:     "Nemesis Pawn",
+		PieceNameEmpoweredQueen:  "Abdicated Queen",
+		PieceNameEmpoweredBishop: "Empowered Bishop",
+		PieceNameEmpoweredKnight: "Empowered Knight",
+		PieceNameEmpoweredRook:   "Empowered Rook",
+		PieceNameReaperQueen:     "Reaper",
+		PieceNameReaperRook:      "Ghost",
+		PieceNameTwoKingsKing:    "Warrior King",
+		PieceNameAnimalsQueen:    "Jungle Queen",
+		PieceNameAnimalsBishop:   "Tiger",
+		PieceNameAnimalsKnight:   "Wild Horse",
+		PieceNameAnimalsRook:     "Elephant",
 	}
 )
 
@@ -140,9 +184,21 @@ func (c Color) String() string {
 	return string(int(c))
 }
 
+func (p PieceName) String() string {
+	if name, found := pieceNames[p]; found {
+		return name
+	}
+	return PieceType(uint8(p) & typeMask).String()
+}
+
 // NewPiece returns a piece with the given properties
 func NewPiece(pieceType PieceType, army Army, color Color) Piece {
 	return Piece{repr: uint8(pieceType) | uint8(army) | uint8(color)}
+}
+
+// WithArmy returns a copied Piece with the army set to the given value.
+func (p Piece) WithArmy(army Army) Piece {
+	return NewPiece(p.Type(), army, p.Color())
 }
 
 // Type returns the piece type of the receiver.
@@ -155,19 +211,20 @@ func (p Piece) Army() Army {
 	return Army(p.repr & armyMask)
 }
 
+// Name returns one of the PieceName* constants. It's a combination of the Army
+// and Type, but pieces which aren't special are converted to ArmyBasic.
+func (p Piece) Name() PieceName {
+	if _, found := pieceNames[PieceName(p.repr&^colorMask)]; found {
+		return PieceName(p.repr &^ colorMask)
+	}
+	return PieceName(p.repr & typeMask)
+}
+
 // Color returns the piece color of the receiver.
 func (p Piece) Color() Color {
 	return Color(p.repr & colorMask)
 }
 
-// Name of the piece based on army and type
-func (p Piece) Name() string {
-	if name, found := pieceNames[p.repr&^colorMask]; found {
-		return name
-	}
-	return fmt.Sprintf("%v %v", p.Army(), p.Type())
-}
-
 func (p Piece) String() string {
-	return fmt.Sprintf("%v %s", p.Color(), p.Name())
+	return fmt.Sprintf("%v %s", p.Color(), p.Name().String())
 }

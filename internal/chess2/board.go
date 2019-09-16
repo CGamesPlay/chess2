@@ -4,9 +4,30 @@ import (
 	"fmt"
 )
 
+const (
+	// MaskEmpty is a mask of an empty board.
+	MaskEmpty = uint64(0)
+	// MaskFull is a mask of an entirely occupied board.
+	MaskFull = ^uint64(0)
+)
+
+var (
+	// MaskRank is a mask of the row at the given y-coordinate.
+	MaskRank = []uint64{
+		0x00000000000000ff,
+		0x000000000000ff00,
+		0x0000000000ff0000,
+		0x00000000ff000000,
+		0x000000ff00000000,
+		0x0000ff0000000000,
+		0x00ff000000000000,
+		0xff00000000000000,
+	}
+)
+
 // A Square represents a location on the board.
 type Square struct {
-	addr uint8
+	Address uint8
 }
 
 // InvalidSquare is not a real Square. It will cause undefined behavior if you
@@ -18,7 +39,7 @@ func SquareFromCoords(x, y int) Square {
 	if x < 0 || x > 7 || y < 0 || y > 7 {
 		panic("Invalid coords for Square")
 	}
-	return Square{addr: uint8(y*8 + x)}
+	return Square{Address: uint8(y*8 + x)}
 }
 
 // SquareFromName takes a name like A1 and returns a Square. Will return
@@ -34,20 +55,47 @@ func SquareFromName(name string) Square {
 	}
 	x = x - 'A'
 	y = '8' - y
-	return Square{addr: uint8(y*8 + x)}
+	return Square{Address: uint8(y*8 + x)}
 }
 
-func (s Square) mask() uint64 {
-	return uint64(1 << s.addr)
+// Mask returns a bitmask that selects only this square.
+func (s Square) Mask() uint64 {
+	return uint64(1 << s.Address)
+}
+
+// Y value of the receiver. Corresponds to y = 8 - rank of the square.
+func (s Square) Y() int {
+	return int(s.Address / 8)
+}
+
+// X value of the receiver. Corresponds to x = file of the square - 'a'.
+func (s Square) X() int {
+	return int(s.Address % 8)
 }
 
 func (s Square) String() string {
 	if s == InvalidSquare {
 		return "--"
 	}
-	x := s.addr % 8
-	y := s.addr / 8
-	return fmt.Sprintf("%c%d", x+'a', 8-y)
+	return fmt.Sprintf("%c%d", s.X()+'a', 8-s.Y())
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+// SquareDistance calculates the greater of the horizontal or vertical distance
+// between the squares.
+func SquareDistance(a, b Square) int {
+	dx := abs(a.X() - b.X())
+	dy := abs(a.Y() - b.Y())
+	if dx > dy {
+		return dx
+	}
+	return dy
 }
 
 func pieceTypeIdx(p PieceType) int {
@@ -63,20 +111,26 @@ type Board struct {
 	// Mask of where the pieces are
 	pieces [6]uint64
 	// Mask of which squares are occupied by which color
-	white, black uint64
+	colors [2]uint64
 }
 
-// PieceAt returns the piece at the given square in the receiver, and a boolean
-// indicating whether the square is occupied
+// PieceAt is like ArmyPieceAt, but without setting a specific Army on the
+// resulting Piece.
 func (b *Board) PieceAt(s Square) (Piece, bool) {
-	squareMask := s.mask()
+	return b.ArmyPieceAt(s, ArmyNone)
+}
+
+// ArmyPieceAt returns the piece at the given square in the receiver, and a
+// boolean indicating whether the square is occupied
+func (b *Board) ArmyPieceAt(s Square, army Army) (Piece, bool) {
+	squareMask := s.Mask()
 	var (
 		color     Color
 		pieceType PieceType
 	)
-	if (b.white|b.black)&squareMask == 0 {
+	if (b.colors[0]|b.colors[1])&squareMask == 0 {
 		return Piece{}, false
-	} else if b.white&squareMask != 0 {
+	} else if b.colors[0]&squareMask != 0 {
 		color = ColorWhite
 	} else {
 		color = ColorBlack
@@ -87,7 +141,7 @@ func (b *Board) PieceAt(s Square) (Piece, bool) {
 			break
 		}
 	}
-	result := NewPiece(pieceType, ArmyNone, color)
+	result := NewPiece(pieceType, army, color)
 	return result, true
 }
 
@@ -95,40 +149,42 @@ func (b *Board) PieceAt(s Square) (Piece, bool) {
 // space.
 func (b *Board) SetPieceAt(s Square, p Piece) {
 	b.ClearPieceAt(s)
-	squareMask := s.mask()
-	switch p.Color() {
-	case ColorWhite:
-		b.white |= squareMask
-	case ColorBlack:
-		b.black |= squareMask
-	}
+	squareMask := s.Mask()
+	b.colors[ColorIdx(p.Color())] |= squareMask
 	b.pieces[pieceTypeIdx(p.Type())] |= squareMask
 }
 
 // ClearPieceAt adjusts the receiver to have an empty square at the provided
 // space.
 func (b *Board) ClearPieceAt(s Square) {
-	squareMask := s.mask()
+	squareMask := s.Mask()
 	for i := range b.pieces {
 		b.pieces[i] &= ^squareMask
 	}
-	b.white &= ^squareMask
-	b.black &= ^squareMask
+	b.colors[0] &= ^squareMask
+	b.colors[1] &= ^squareMask
 }
 
 // ReplacePieces modifies the board so that all pieces of the given color and
 // find type are replaced by a corresponding piece of the same color of the
 // replace type.
 func (b *Board) ReplacePieces(color Color, find, replace PieceType) {
-	var mask uint64
-	if color == ColorWhite {
-		mask = b.white
-	} else {
-		mask = b.black
-	}
+	mask := b.colors[ColorIdx(color)]
 	idx := pieceTypeIdx(find)
 	mask &= b.pieces[idx]
 	b.pieces[idx] &= ^mask
 	idx = pieceTypeIdx(replace)
 	b.pieces[idx] |= mask
+}
+
+func (b *Board) occupiedMask() uint64 {
+	return b.colors[0] | b.colors[1]
+}
+
+func (b *Board) pieceMask(p PieceType) uint64 {
+	return b.pieces[pieceTypeIdx(p)]
+}
+
+func (b *Board) colorMask(c Color) uint64 {
+	return b.colors[ColorIdx(c)]
 }
