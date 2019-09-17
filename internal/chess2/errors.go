@@ -32,6 +32,14 @@ const (
 	// IllegalRampageError is any Elephant move that captures and doesn't follow
 	// the rampage rules.
 	IllegalRampageError
+	// TooManyDuelsError is a move with more duels than there are pieces
+	// captures.
+	TooManyDuelsError
+	// NotEnoughStonesError is a move where the challenges or responses would
+	// result in negative stone counts.
+	NotEnoughStonesError
+	// NotDuelableError is a move that attempts to duel with a king.
+	NotDuelableError
 )
 
 func (code IllegalMoveError) Error() string {
@@ -58,6 +66,12 @@ func (code IllegalMoveError) Error() string {
 		return "illegal capture"
 	case IllegalRampageError:
 		return "illegal rampage"
+	case TooManyDuelsError:
+		return "too many duels"
+	case NotEnoughStonesError:
+		return "not enough stones"
+	case NotDuelableError:
+		return "cannot duel with kings"
 	default:
 		panic("invalid error code")
 	}

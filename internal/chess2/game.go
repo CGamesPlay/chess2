@@ -164,10 +164,13 @@ func singleStepMask(from Square, toMask uint64) uint64 {
 }
 
 type moveExecution struct {
+	epSquare       Square
 	attackerStones int
 	defenderStones int
 	isCapture      bool
 	duels          []Duel
+	dryRun         bool
+	err            error
 }
 
 // A Game fully describes a Chess 2 game.
@@ -266,76 +269,34 @@ func applyMoveTo(old *Game, move Move) Game {
 		return g
 	}
 
-	isZeroingMove := false
-	delta := int(move.To.Address) - int(move.From.Address)
-
 	// Handle captures and duels
 	p, _ := g.board.PieceAt(move.From)
 	p = p.WithArmy(g.armies[ColorIdx(p.Color())])
 	me := moveExecution{
+		epSquare:       epSquare,
 		attackerStones: g.stones[ColorIdx(movingPlayer)],
 		defenderStones: g.stones[1-ColorIdx(movingPlayer)],
 		duels:          move.Duels[:],
+		dryRun:         false,
 	}
-	survived := true
-	if p.Name() == PieceNameAnimalsRook {
-		var delta, step int
-		if delta <= -8 {
-			step = -8
-		} else if delta < 0 {
-			step = -1
-		} else if delta < 8 {
-			step = 1
-		} else {
-			step = 8
-		}
-		for {
-			delta += step
-			if delta > 64 || delta < -64 {
-				panic("invalid rampage")
-			}
-			target := Square{Address: uint8(int(move.From.Address) + delta)}
-			survived = g.handleCapture(p, target, &me)
-			if !survived {
-				break
-			}
-			if target == move.To {
-				break
-			}
-		}
-	} else if p.Name() == PieceNameTwoKingsKing && move.From == move.To {
-		captureMask := dist1Mask[move.From.Address] & g.board.occupiedMask()
-		if g.armies[1-ColorIdx(movingPlayer)] == ArmyReaper {
-			captureMask &^= g.board.pieceMask(TypeRook) & g.board.colorMask(OtherColor(movingPlayer))
-		}
-		if captureMask != 0 {
-			isZeroingMove = true
-		}
-		eachSquareInMask(captureMask, func(target Square) {
-			g.handleCapture(p, target, &me)
-		})
-	} else {
-		target := move.To
-		if p.Type() == TypePawn && move.To == epSquare {
-			// white = -1, black = 1
-			sign := -1 + ColorIdx(p.Color())*2
-			if delta == sign*7 || delta == sign*9 {
-				target = Square{Address: uint8(int(move.To.Address) - sign*8)}
-			}
-		}
-		survived = g.handleCapture(p, target, &me)
-	}
+	survived := g.handleAllCaptures(p, move, &me)
 
 	// Update stones
 	g.stones[ColorIdx(movingPlayer)] = me.attackerStones
 	g.stones[1-ColorIdx(movingPlayer)] = me.defenderStones
-	isZeroingMove = me.isCapture
+	isZeroingMove := me.isCapture
 
 	// Move the piece
+	delta := int(move.To.Address) - int(move.From.Address)
 	if survived {
 		if p.Name() != PieceNameAnimalsBishop || !isZeroingMove {
 			g.board.ClearPieceAt(move.From)
-			g.board.SetPieceAt(move.To, p)
+			if move.Piece != InvalidPiece {
+				promoted := NewPiece(move.Piece.Type(), p.Army(), p.Color())
+				g.board.SetPieceAt(move.To, promoted)
+			} else {
+				g.board.SetPieceAt(move.To, p)
+			}
 		}
 	} else {
 		g.board.ClearPieceAt(move.From)
@@ -377,23 +338,93 @@ func applyMoveTo(old *Game, move Move) Game {
 	return g
 }
 
+func (g *Game) handleAllCaptures(p Piece, move Move, me *moveExecution) bool {
+	survived := true
+	delta := int(move.To.Address) - int(move.From.Address)
+	if p.Name() == PieceNameAnimalsRook {
+		var delta, step int
+		if delta <= -8 {
+			step = -8
+		} else if delta < 0 {
+			step = -1
+		} else if delta < 8 {
+			step = 1
+		} else {
+			step = 8
+		}
+		for {
+			delta += step
+			if delta > 64 || delta < -64 {
+				panic("invalid rampage")
+			}
+			target := Square{Address: uint8(int(move.From.Address) + delta)}
+			survived = g.handleCapture(p, target, me)
+			if !survived {
+				break
+			}
+			if target == move.To {
+				break
+			}
+		}
+	} else if p.Name() == PieceNameTwoKingsKing && move.From == move.To {
+		captureMask := dist1Mask[move.From.Address] & g.board.occupiedMask()
+		if g.armies[1-ColorIdx(p.Color())] == ArmyReaper {
+			captureMask &^= g.board.pieceMask(TypeRook) & g.board.colorMask(OtherColor(p.Color()))
+		}
+		eachSquareInMask(captureMask, func(target Square) {
+			g.handleCapture(p, target, me)
+		})
+	} else {
+		target := move.To
+		if p.Type() == TypePawn && move.To == me.epSquare {
+			// white = -1, black = 1
+			sign := -1 + ColorIdx(p.Color())*2
+			if delta == sign*7 || delta == sign*9 {
+				target = Square{Address: uint8(int(move.To.Address) - sign*8)}
+			}
+		}
+		survived = g.handleCapture(p, target, me)
+	}
+	return survived
+}
+
 func (g *Game) handleCapture(attacker Piece, target Square, me *moveExecution) bool {
 	defender, isCapture := g.board.PieceAt(target)
+	if !isCapture {
+		return true
+	}
 	me.isCapture = me.isCapture || isCapture
 	survived := true
-	g.board.ClearPieceAt(target)
+	if !me.dryRun {
+		g.board.ClearPieceAt(target)
+	}
 	if len(me.duels) > 0 {
 		if d := me.duels[0]; d.IsStarted() {
+			if (attacker.Type() == TypeKing || defender.Type() == TypeKing) && me.err == nil {
+				me.err = NotDuelableError
+			}
 			if DuelingRank(attacker.Type()) < DuelingRank(defender.Type()) {
-				me.attackerStones--
+				if me.attackerStones > 0 {
+					me.attackerStones--
+				} else if me.err == nil {
+					me.err = NotEnoughStonesError
+				}
+			}
+			if d.Challenge() > me.defenderStones ||
+				d.Response() > me.attackerStones && me.err == nil {
+				me.err = NotEnoughStonesError
 			}
 			me.defenderStones -= d.Challenge()
 			me.attackerStones -= d.Response()
 			if d.Challenge() == 0 && d.Response() == 0 {
 				if d.Gain() {
-					me.attackerStones++
+					if me.attackerStones < 6 {
+						me.attackerStones++
+					}
 				} else {
-					me.defenderStones--
+					if me.defenderStones > 0 {
+						me.defenderStones--
+					}
 				}
 			}
 			survived = d.Challenge() <= d.Response()
@@ -649,8 +680,34 @@ func (g *Game) attackMask(from Square) uint64 {
 // ValidateDuels returns an error describing why the duels on given move are not
 // legal.
 func (g *Game) ValidateDuels(move Move) error {
-	// Check number of duels
-	panic("not implemented")
+	if move.IsDrop() || move.IsPass() {
+		for _, d := range move.Duels {
+			if d.IsStarted() {
+				return TooManyDuelsError
+			}
+		}
+		return nil
+	}
+
+	p, _ := g.board.PieceAt(move.From)
+	p = p.WithArmy(g.armies[ColorIdx(p.Color())])
+	me := moveExecution{
+		epSquare:       g.epSquare,
+		attackerStones: g.stones[ColorIdx(g.toMove)],
+		defenderStones: g.stones[1-ColorIdx(g.toMove)],
+		duels:          move.Duels[:],
+		dryRun:         true,
+	}
+	g.handleAllCaptures(p, move, &me)
+	if me.err != nil {
+		return me.err
+	}
+	for _, d := range me.duels {
+		if d.IsStarted() {
+			return TooManyDuelsError
+		}
+	}
+	return nil
 }
 
 // Given a mask, call the function for each Square set in the mask.

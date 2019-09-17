@@ -340,6 +340,20 @@ func TestValidatePseudoLegalMove(t *testing.T) {
 			epd:  "8/2P5/4k3/8/8/8/8/4K3 w KQkq - 0 1 nc 33",
 			move: "c7c6",
 		},
+		"illegal nemesis move": {
+			epd:  "4k3/8/8/8/8/8/3P4/4K3 w - - 0 1 nc 33",
+			move: "d2c2",
+			err:  UnreachableSquareError,
+		},
+		"legal nemesis move": {
+			epd:  "4k3/8/8/8/8/8/3P4/4K3 w - - 0 1 nc 33",
+			move: "d2e2",
+		},
+		"illegal capturing nemesis move": {
+			epd:  "4k3/8/8/8/8/8/3Pp3/4K3 w - - 0 1 nc 33",
+			move: "d2e2",
+			err:  IllegalCaptureError,
+		},
 		"pawn double move capture": {
 			epd:  "4k3/8/8/8/4p3/8/4P3/4K3 w - - 0 1 cc 33",
 			move: "e2e4",
@@ -426,12 +440,36 @@ func TestValidatePseudoLegalMove(t *testing.T) {
 	}
 }
 
-/*
 func TestValidateDuels(t *testing.T) {
 	cases := map[string]ValidateMoveTest{
 		"legal duel": {
 			epd:  "4k3/8/8/4p3/3P4/8/8/4K3 w - - 0 1 cc 33",
-			move: "d4d5:22",
+			move: "d4e5:22",
+		},
+		"duel without capture": {
+			epd:  "4k3/8/8/4p3/3P4/8/8/4K3 w - - 0 1 cc 33",
+			move: "d4d5:00+",
+			err:  TooManyDuelsError,
+		},
+		"challenge too expensive": {
+			epd:  "4k3/8/8/4p3/3P4/8/8/4K3 w - - 0 1 cc 13",
+			move: "d4e5:22",
+			err:  NotEnoughStonesError,
+		},
+		"response too expensive": {
+			epd:  "4k3/8/8/4p3/3P4/8/8/4K3 w - - 0 1 cc 31",
+			move: "d4e5:22",
+			err:  NotEnoughStonesError,
+		},
+		"cannot pay to initiate": {
+			epd:  "4k3/8/8/4b3/3P4/8/8/4K3 w - - 0 1 cc 03",
+			move: "d4e5:12",
+			err:  NotEnoughStonesError,
+		},
+		"king is dueling": {
+			epd:  "4k3/8/8/8/8/8/4p3/4K3 w - - 0 1 cc 33",
+			move: "e1e2:22",
+			err:  NotDuelableError,
 		},
 	}
 	for name, config := range cases {
@@ -447,7 +485,6 @@ func TestValidateDuels(t *testing.T) {
 		}
 	}
 }
-*/
 
 func TestApplyMove(t *testing.T) {
 	cases := map[string]struct {
@@ -584,6 +621,11 @@ func TestApplyMove(t *testing.T) {
 			before: "4k3/8/8/4p3/3P4/8/8/4K3 w - - 0 1 cc 33",
 			move:   "d4e5:00-",
 			after:  "4k3/8/8/4P3/8/8/8/4K3 b - - 0 1 cc 42",
+		},
+		"promotion": {
+			before: "4k3/1P6/8/8/8/8/8/4K3 w - - 0 1 cc 33",
+			move:   "b7b8q",
+			after:  "1Q2k3/8/8/8/8/8/8/4K3 b - - 0 1 cc 33",
 		},
 	}
 	for name, config := range cases {
