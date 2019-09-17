@@ -163,6 +163,22 @@ func OtherColor(color Color) Color {
 	return ColorWhite
 }
 
+// DuelingRank computes the dueling rank of the given piece type. Dueling a
+// piece of a higher dueling rank requires paying a stone.
+func DuelingRank(t PieceType) int {
+	switch t {
+	case TypePawn:
+		return 1
+	case TypeKnight, TypeBishop:
+		return 3
+	case TypeRook:
+		return 5
+	case TypeQueen:
+		return 9
+	}
+	return 100
+}
+
 func (t PieceType) String() string {
 	if name, found := basicTypeNames[t]; found {
 		return name

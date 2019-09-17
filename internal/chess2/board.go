@@ -153,6 +153,15 @@ func (b *Board) ClearPieceAt(s Square) {
 	b.colors[1] &= ^squareMask
 }
 
+// MovePiece adjusts the receiver to clear the source square and place the piece
+// that was there at the destination square. It will replace any piece already
+// in the destination square.
+func (b *Board) MovePiece(from, to Square) {
+	p, _ := b.PieceAt(from)
+	b.ClearPieceAt(from)
+	b.SetPieceAt(to, p)
+}
+
 // ReplacePieces modifies the board so that all pieces of the given color and
 // find type are replaced by a corresponding piece of the same color of the
 // replace type.

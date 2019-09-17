@@ -463,12 +463,12 @@ func TestApplyMove(t *testing.T) {
 		"pass without two kings": {
 			before: "8/8/8/8/8/8/8/8 w KQkq - 0 1 nk 33",
 			move:   "0000",
-			after:  "8/8/8/8/8/8/8/8 b KQkq - 0 1 nk 33",
+			after:  "8/8/8/8/8/8/8/8 b KQkq - 1 1 nk 33",
 		},
 		"pass with two kings": {
 			before: "8/8/8/8/8/8/8/8 w KQkq - 0 1 ka 33",
 			move:   "0000",
-			after:  "8/8/8/8/8/8/8/8 K KQkq - 0 1 ka 33",
+			after:  "8/8/8/8/8/8/8/8 K KQkq - 1 1 ka 33",
 		},
 		"pass on king-turn": {
 			before: "8/8/8/8/8/8/8/8 K KQkq - 0 1 ka 33",
@@ -476,14 +476,114 @@ func TestApplyMove(t *testing.T) {
 			after:  "8/8/8/8/8/8/8/8 b KQkq - 0 1 ka 33",
 		},
 		"normal move": {
-			before: "4k3/8/8/8/8/8/8/4K3 w KQkq - 0 1 cc 33",
+			before: "4k3/8/8/4p3/8/8/8/4K3 w KQkq e6 0 1 cc 33",
 			move:   "e1e2",
-			after:  "4k3/8/8/8/8/8/4K3/8 b KQkq - 0 1 cc 33",
+			after:  "4k3/8/8/4p3/8/8/4K3/8 b kq - 1 1 cc 33",
 		},
 		"capturing move": {
-			before: "4k3/8/8/8/8/8/4b3/4K3 w KQkq - 0 1 cc 33",
+			before: "4k3/8/8/8/8/8/4b3/4K3 w - - 0 1 cc 33",
 			move:   "e1e2",
-			after:  "4k3/8/8/8/8/8/4K3/8 b KQkq - 0 1 cc 33",
+			after:  "4k3/8/8/8/8/8/4K3/8 b - - 0 1 cc 33",
+		},
+		"capturing pawn": {
+			before: "4k3/8/8/8/8/8/4p3/4K3 w KQkq - 0 1 cc 33",
+			move:   "e1e2",
+			after:  "4k3/8/8/8/8/8/4K3/8 b kq - 0 1 cc 43",
+		},
+		"capture en-passant": {
+			before: "4k3/8/8/3Pp3/8/8/8/4K3 w KQkq e6 0 1 cc 33",
+			move:   "d5e6",
+			after:  "4k3/8/4P3/8/8/8/8/4K3 b KQkq - 0 1 cc 43",
+		},
+		"non-pawn to ep square": {
+			before: "4k3/8/8/3Bp3/8/8/8/4K3 w - e6 0 1 cc 33",
+			move:   "d5e6",
+			after:  "4k3/8/4B3/4p3/8/8/8/4K3 b - - 1 1 cc 33",
+		},
+		"nemesis move to ep square": {
+			before: "4k3/8/3P4/4p3/8/8/8/4K3 w - - 0 1 nc 33",
+			move:   "d6e6",
+			after:  "4k3/8/4P3/4p3/8/8/8/4K3 b - - 1 1 nc 33",
+		},
+		"advance fullmove number": {
+			before: "8/8/8/8/8/8/8/8 b KQkq - 0 1 cc 33",
+			move:   "0000",
+			after:  "8/8/8/8/8/8/8/8 w KQkq - 1 2 cc 33",
+		},
+		"set ep square": {
+			before: "4k3/8/8/8/8/8/4P3/4K3 w KQkq - 0 1 cc 33",
+			move:   "e2e4",
+			after:  "4k3/8/8/8/4P3/8/8/4K3 b KQkq e3 0 1 cc 33",
+		},
+		"preserve ep square on king-turn": {
+			before: "4k3/8/8/4p3/8/8/8/4K3 k - e6 0 1 ck 33",
+			move:   "e8e7",
+			after:  "8/4k3/8/4p3/8/8/8/4K3 w - e6 0 2 ck 33",
+		},
+		"clear castling rights on rook move": {
+			before: "4k3/8/8/8/8/8/8/R3K2R w KQ - 0 1 cc 33",
+			move:   "a1a8",
+			after:  "R3k3/8/8/8/8/8/8/4K2R b K - 1 1 cc 33",
+		},
+		"clear castling rights on king move": {
+			before: "4k3/8/8/8/8/8/8/R3K2R w KQ - 0 1 cc 33",
+			move:   "e1e2",
+			after:  "4k3/8/8/8/8/8/4K3/R6R b - - 1 1 cc 33",
+		},
+		"castling queenside": {
+			before: "4k3/8/8/8/8/8/8/R3K3 w KQ - 0 1 cc 33",
+			move:   "e1c1",
+			after:  "4k3/8/8/8/8/8/8/2KR4 b - - 1 1 cc 33",
+		},
+		"castling kingside": {
+			before: "4k2r/8/8/8/8/8/8/4K3 b kq - 0 1 cc 33",
+			move:   "e8g8",
+			after:  "5rk1/8/8/8/8/8/8/4K3 w - - 1 2 cc 33",
+		},
+		"animals bishop noncapture": {
+			before: "4k3/8/8/8/8/5p2/8/3BK3 w - - 0 1 ac 33",
+			move:   "d1e2",
+			after:  "4k3/8/8/8/8/5p2/4B3/4K3 b - - 1 1 ac 33",
+		},
+		"animals bishop capture": {
+			before: "4k3/8/8/8/8/5p2/8/3BK3 w - - 0 1 ac 33",
+			move:   "d1f3",
+			after:  "4k3/8/8/8/8/8/8/3BK3 b - - 0 1 ac 43",
+		},
+		"whirlwind attack": {
+			before: "4k3/8/8/2Prp3/2bKn3/2pBP3/8/4K3 w - - 0 1 kr 33",
+			move:   "d4d4",
+			after:  "4k3/8/8/3r4/3K4/8/8/4K3 K - - 0 1 kr 53",
+		},
+		"rampage": {
+			before: "4k3/Rppp4/8/8/8/8/8/4K3 w - - 0 1 ac 33",
+			move:   "a7d7",
+			after:  "4k3/3R4/8/8/8/8/8/4K3 b - - 0 1 ac 63",
+		},
+		"winning challenge": {
+			before: "4k3/8/8/4p3/3P4/8/8/4K3 w - - 0 1 cc 33",
+			move:   "d4e5:10+",
+			after:  "4k3/8/8/8/8/8/8/4K3 b - - 0 1 cc 42",
+		},
+		"losing challenge": {
+			before: "4k3/8/8/4p3/3P4/8/8/4K3 w - - 0 1 cc 33",
+			move:   "d4e5:11",
+			after:  "4k3/8/8/4P3/8/8/8/4K3 b - - 0 1 cc 32",
+		},
+		"pay to duel": {
+			before: "4k3/8/8/4b3/3P4/8/8/4K3 w - - 0 1 cc 33",
+			move:   "d4e5:22",
+			after:  "4k3/8/8/4P3/8/8/8/4K3 b - - 0 1 cc 01",
+		},
+		"call bluff, gain": {
+			before: "4k3/8/8/4p3/3P4/8/8/4K3 w - - 0 1 cc 33",
+			move:   "d4e5:00+",
+			after:  "4k3/8/8/4P3/8/8/8/4K3 b - - 0 1 cc 53",
+		},
+		"call bluff, lose": {
+			before: "4k3/8/8/4p3/3P4/8/8/4K3 w - - 0 1 cc 33",
+			move:   "d4e5:00-",
+			after:  "4k3/8/8/4P3/8/8/8/4K3 b - - 0 1 cc 42",
 		},
 	}
 	for name, config := range cases {

@@ -25,6 +25,7 @@ var (
 	castleBlackQueenside = SquareFromName("A8").Mask()
 	castleKingside       = castleWhiteKingside | castleBlackKingside
 	castleQueenside      = castleWhiteQueenside | castleBlackQueenside
+	castles              = []uint64{castleWhiteKingside, castleWhiteQueenside, castleBlackKingside, castleBlackQueenside}
 )
 
 // buildSlidingAttackMask creates a bitmask for each of 64 squares of the
@@ -162,6 +163,13 @@ func singleStepMask(from Square, toMask uint64) uint64 {
 	return mask
 }
 
+type moveExecution struct {
+	attackerStones int
+	defenderStones int
+	isCapture      bool
+	duels          []Duel
+}
+
 // A Game fully describes a Chess 2 game.
 type Game struct {
 	board          Board
@@ -238,22 +246,164 @@ func applyMoveTo(old *Game, move Move) Game {
 	}
 
 	// Advance turn
-	if g.armies[ColorIdx(g.toMove)] == ArmyTwoKings && !g.kingTurn {
+	movingPlayer := g.toMove
+	epSquare := g.epSquare
+	if !g.kingTurn {
+		g.halfmoveClock++
+		g.epSquare = InvalidSquare
+	}
+	if g.armies[ColorIdx(movingPlayer)] == ArmyTwoKings && !g.kingTurn {
 		g.kingTurn = true
 	} else {
 		g.kingTurn = false
-		g.toMove = OtherColor(g.toMove)
+		g.toMove = OtherColor(movingPlayer)
+	}
+	if g.toMove == ColorWhite && !g.kingTurn {
+		g.fullmoveNumber++
 	}
 
 	if move.IsPass() {
 		return g
 	}
 
+	isZeroingMove := false
+	delta := int(move.To.Address) - int(move.From.Address)
+
+	// Handle captures and duels
 	p, _ := g.board.PieceAt(move.From)
-	g.board.ClearPieceAt(move.From)
-	g.board.SetPieceAt(move.To, p)
+	p = p.WithArmy(g.armies[ColorIdx(p.Color())])
+	me := moveExecution{
+		attackerStones: g.stones[ColorIdx(movingPlayer)],
+		defenderStones: g.stones[1-ColorIdx(movingPlayer)],
+		duels:          move.Duels[:],
+	}
+	survived := true
+	if p.Name() == PieceNameAnimalsRook {
+		var delta, step int
+		if delta <= -8 {
+			step = -8
+		} else if delta < 0 {
+			step = -1
+		} else if delta < 8 {
+			step = 1
+		} else {
+			step = 8
+		}
+		for {
+			delta += step
+			if delta > 64 || delta < -64 {
+				panic("invalid rampage")
+			}
+			target := Square{Address: uint8(int(move.From.Address) + delta)}
+			survived = g.handleCapture(p, target, &me)
+			if !survived {
+				break
+			}
+			if target == move.To {
+				break
+			}
+		}
+	} else if p.Name() == PieceNameTwoKingsKing && move.From == move.To {
+		captureMask := dist1Mask[move.From.Address] & g.board.occupiedMask()
+		if g.armies[1-ColorIdx(movingPlayer)] == ArmyReaper {
+			captureMask &^= g.board.pieceMask(TypeRook) & g.board.colorMask(OtherColor(movingPlayer))
+		}
+		if captureMask != 0 {
+			isZeroingMove = true
+		}
+		eachSquareInMask(captureMask, func(target Square) {
+			g.handleCapture(p, target, &me)
+		})
+	} else {
+		target := move.To
+		if p.Type() == TypePawn && move.To == epSquare {
+			// white = -1, black = 1
+			sign := -1 + ColorIdx(p.Color())*2
+			if delta == sign*7 || delta == sign*9 {
+				target = Square{Address: uint8(int(move.To.Address) - sign*8)}
+			}
+		}
+		survived = g.handleCapture(p, target, &me)
+	}
+
+	// Update stones
+	g.stones[ColorIdx(movingPlayer)] = me.attackerStones
+	g.stones[1-ColorIdx(movingPlayer)] = me.defenderStones
+	isZeroingMove = me.isCapture
+
+	// Move the piece
+	if survived {
+		if p.Name() != PieceNameAnimalsBishop || !isZeroingMove {
+			g.board.ClearPieceAt(move.From)
+			g.board.SetPieceAt(move.To, p)
+		}
+	} else {
+		g.board.ClearPieceAt(move.From)
+	}
+	if p.Type() == TypePawn && p.Army() != ArmyNemesis {
+		isZeroingMove = true
+		if SquareDistance(move.From, move.To) > 1 {
+			g.epSquare = Square{Address: uint8(int(move.From.Address) + delta/2)}
+		}
+	} else if p.Name() == PieceNameClassicKing {
+		// Clear castling rights on king move
+		firstRank := MaskRank[7-7*ColorIdx(p.Color())]
+		g.castlingRights &^= firstRank
+
+		// Move rook when castling
+		if delta == -2 {
+			g.board.MovePiece(
+				Square{Address: move.To.Address - 2},
+				Square{Address: move.To.Address + 1},
+			)
+		} else if delta == 2 {
+			g.board.MovePiece(
+				Square{Address: move.To.Address + 1},
+				Square{Address: move.To.Address - 1},
+			)
+		}
+	}
+
+	// Update the halfmove clock
+	if isZeroingMove {
+		g.halfmoveClock = 0
+	}
+	for _, mask := range castles {
+		if move.From.Mask()&mask != 0 {
+			g.castlingRights &^= mask
+		}
+	}
 
 	return g
+}
+
+func (g *Game) handleCapture(attacker Piece, target Square, me *moveExecution) bool {
+	defender, isCapture := g.board.PieceAt(target)
+	me.isCapture = me.isCapture || isCapture
+	survived := true
+	g.board.ClearPieceAt(target)
+	if len(me.duels) > 0 {
+		if d := me.duels[0]; d.IsStarted() {
+			if DuelingRank(attacker.Type()) < DuelingRank(defender.Type()) {
+				me.attackerStones--
+			}
+			me.defenderStones -= d.Challenge()
+			me.attackerStones -= d.Response()
+			if d.Challenge() == 0 && d.Response() == 0 {
+				if d.Gain() {
+					me.attackerStones++
+				} else {
+					me.defenderStones--
+				}
+			}
+			survived = d.Challenge() <= d.Response()
+		}
+		me.duels = me.duels[1:]
+	}
+	if defender.Color() != attacker.Color() && defender.Type() == TypePawn && me.attackerStones < 6 {
+		me.attackerStones++
+	}
+	return survived
 }
 
 // ValidatePseudoLegalMove returns an error describing why the given move is not
