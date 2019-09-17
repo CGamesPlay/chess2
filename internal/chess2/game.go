@@ -540,6 +540,12 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 			if g.board.occupiedMask()&firstRank != 0 {
 				return IllegalCastleError
 			}
+			checkSq := Square{Address: move.From.Address + uint8(diff/2)}
+			threats := g.board.colorMask(OtherColor(piece.Color()))
+			threatenedMask := g.fullAttackMask(threats)
+			if threatenedMask&checkSq.Mask() != 0 {
+				return IllegalCastleError
+			}
 			return validateNoDuels(move, NotDuelableError)
 		}
 		// Otherwise normal sliding attack rules apply
@@ -707,9 +713,18 @@ func (g *Game) attackMask(from Square) uint64 {
 		return diagAttackMask[from.Address][diag] & dist2Mask[from.Address]
 	case PieceNameAnimalsRook:
 		return orthAttackMask[from.Address][0] & dist3Mask[from.Address]
+		// TODO - if there's a possible duel for the defender to kill the
+		// elephant, the threat mask should end at that point.
 	default:
 		panic("Invalid piece type")
 	}
+}
+
+func (g *Game) fullAttackMask(from uint64) (result uint64) {
+	eachSquareInMask(from, func(sq Square) {
+		result |= g.attackMask(sq)
+	})
+	return
 }
 
 // ValidateDuels returns an error describing why the duels on given move are not

@@ -412,6 +412,11 @@ func TestValidatePseudoLegalMove(t *testing.T) {
 			move: "e1c1",
 			err:  IllegalCastleError,
 		},
+		"illegal castle through check": {
+			epd:  "3rk3/8/8/8/8/8/8/R3K3 w Q - 0 1 cc 33",
+			move: "e1c1",
+			err:  IllegalCastleError,
+		},
 		"legal castle": {
 			epd:  "4k3/8/8/8/8/8/8/R3K3 w KQkq - 0 1 cn 33",
 			move: "e1c1",
