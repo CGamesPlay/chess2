@@ -420,6 +420,15 @@ func TestValidatePseudoLegalMove(t *testing.T) {
 			epd:  "4k3/8/8/8/RnpP4/8/8/4K3 w KQkq - 0 1 ac 33",
 			move: "a4d4",
 		},
+		"rampage at left": {
+			epd:  "4k3/8/8/8/8/8/1pR5/4K3 w - - 0 1 ac 33",
+			move: "c2a2",
+		},
+		"elephant short rampage": {
+			epd:  "4k3/8/8/8/8/2p5/2R5/4K3 w - - 0 1 ac 33",
+			move: "c2c3",
+			err:  IllegalRampageError,
+		},
 		"illegal elephant capture": {
 			epd:  "4k3/8/8/8/Rn6/8/8/4K3 w KQkq - 0 1 ac 33",
 			move: "a4b4",

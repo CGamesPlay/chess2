@@ -340,14 +340,14 @@ func applyMoveTo(old *Game, move Move) Game {
 
 func (g *Game) handleAllCaptures(p Piece, move Move, me *moveExecution) bool {
 	survived := true
-	delta := int(move.To.Address) - int(move.From.Address)
+	diff := int(move.To.Address) - int(move.From.Address)
 	if p.Name() == PieceNameAnimalsRook {
 		var delta, step int
-		if delta <= -8 {
+		if diff <= -8 {
 			step = -8
-		} else if delta < 0 {
+		} else if diff < 0 {
 			step = -1
-		} else if delta < 8 {
+		} else if diff < 8 {
 			step = 1
 		} else {
 			step = 8
@@ -379,7 +379,7 @@ func (g *Game) handleAllCaptures(p Piece, move Move, me *moveExecution) bool {
 		if p.Type() == TypePawn && move.To == me.epSquare {
 			// white = -1, black = 1
 			sign := -1 + ColorIdx(p.Color())*2
-			if delta == sign*7 || delta == sign*9 {
+			if diff == sign*7 || diff == sign*9 {
 				target = Square{Address: uint8(int(move.To.Address) - sign*8)}
 			}
 		}
@@ -455,7 +455,7 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 		if !g.kingTurn {
 			return IllegalPassError
 		}
-		return nil
+		return validateNoDuels(move, TooManyDuelsError)
 	}
 
 	// Check turn
@@ -493,7 +493,7 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 			if targetOccupied {
 				return IllegalCaptureError
 			}
-			return nil
+			return validateNoDuels(move, TooManyDuelsError)
 		} else if forwardDiff == 16 && piece.Army() != ArmyNemesis {
 			// targetRank = 4 for white, 3 for black
 			targetRank := 4 - ColorIdx(piece.Color())
@@ -503,12 +503,12 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 			} else if targetOccupied {
 				return IllegalCaptureError
 			}
-			return nil
+			return validateNoDuels(move, TooManyDuelsError)
 		} else if forwardDiff == 7 || forwardDiff == 9 {
 			if SquareDistance(move.From, move.To) > 1 {
 				return UnreachableSquareError
 			} else if move.To == g.epSquare {
-				return nil
+				return g.ValidateDuels(move)
 			}
 		} else if piece.Army() == ArmyNemesis {
 			// Check for nemesis move
@@ -518,7 +518,7 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 			} else if targetOccupied {
 				return IllegalCaptureError
 			}
-			return nil
+			return validateNoDuels(move, TooManyDuelsError)
 		}
 		// Otherwise normal sliding attack rules apply
 	}
@@ -540,7 +540,7 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 			if g.board.occupiedMask()&firstRank != 0 {
 				return IllegalCastleError
 			}
-			return nil
+			return validateNoDuels(move, NotDuelableError)
 		}
 		// Otherwise normal sliding attack rules apply
 	}
@@ -554,7 +554,7 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 		if attackedKings != 0 {
 			return IllegalCaptureError
 		}
-		return nil
+		return validateNoDuels(move, TooManyDuelsError)
 	}
 
 	// Check valid sliding attack
@@ -592,12 +592,47 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 		return IllegalCaptureError
 	}
 
-	if piece.Name() == PieceNameAnimalsRook &&
-		attemptedCapturesMask != 0 &&
-		SquareDistance(move.From, move.To) != 3 {
-		return IllegalRampageError
+	if piece.Name() == PieceNameAnimalsRook && attemptedCapturesMask != 0 {
+		diff := int(move.To.Address) - int(move.From.Address)
+		if SquareDistance(move.From, move.To) < 3 {
+			// Moving less than 3 spaces is only allowed if the elephant hits a
+			// noncapturable piece or the edge of the board.
+			var step int
+			var hitWall bool
+			if diff <= -8 {
+				step = -8
+				hitWall = move.To.Y() == 0
+			} else if diff < 0 {
+				step = -1
+				hitWall = move.To.X() == 0
+			} else if diff < 8 {
+				step = 1
+				hitWall = move.To.X() == 7
+			} else {
+				step = 8
+				hitWall = move.To.Y() == 7
+			}
+			if !hitWall {
+				checkAddr := int(move.To.Address) + step
+				if checkAddr >= 0 && checkAddr < 64 {
+					wall := Square{Address: uint8(checkAddr)}
+					if noncapturableMask&wall.Mask() == 0 {
+						return IllegalRampageError
+					}
+				}
+			}
+		}
 	}
 
+	return g.ValidateDuels(move)
+}
+
+func validateNoDuels(move Move, err error) error {
+	for _, d := range move.Duels {
+		if d.IsStarted() {
+			return err
+		}
+	}
 	return nil
 }
 
