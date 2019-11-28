@@ -40,6 +40,8 @@ const (
 	NotEnoughStonesError
 	// NotDuelableError is a move that attempts to duel with a king.
 	NotDuelableError
+	// MoveIntoCheckError is a move that results in a king being in check.
+	MoveIntoCheckError
 )
 
 func (code IllegalMoveError) Error() string {
@@ -72,6 +74,8 @@ func (code IllegalMoveError) Error() string {
 		return "not enough stones"
 	case NotDuelableError:
 		return "cannot duel with kings"
+	case MoveIntoCheckError:
+		return "moving into check"
 	default:
 		panic("invalid error code")
 	}

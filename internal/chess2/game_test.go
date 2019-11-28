@@ -216,6 +216,49 @@ func TestAttackMask(t *testing.T) {
 	}
 }
 
+type IsInCheckTest struct {
+	epd     string
+	color   Color
+	inCheck bool
+}
+
+func TestIsInCheck(t *testing.T) {
+	cases := map[string]IsInCheckTest{
+		"not in check": {
+			epd:     "4k3/8/8/8/8/8/8/4K3 w - - 0 1 cc 33",
+			color:   ColorWhite,
+			inCheck: false,
+		},
+		"regular threat": {
+			epd:     "4k3/8/8/8/1b6/8/8/4K3 w - - 0 1 cc 33",
+			color:   ColorWhite,
+			inCheck: true,
+		},
+		"rampage would kill opponent": {
+			epd:     "4k3/8/8/8/8/8/8/2rK4 b - - 0 1 ca 33",
+			color:   ColorWhite,
+			inCheck: true,
+		},
+		"rampage would kill own king": {
+			epd:     "8/8/8/8/8/8/8/2rK1k2 b - - 0 1 ca 33",
+			color:   ColorWhite,
+			inCheck: false,
+		},
+	}
+	for name, config := range cases {
+		if name == "rampage would kill own king" {
+			if testing.Verbose() {
+				t.Logf("skipping case %s\n", name)
+			}
+			continue
+		}
+		game, err := ParseEpd(config.epd)
+		require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
+		inCheck := game.IsInCheck(config.color)
+		assert.Equal(t, inCheck, config.inCheck, "Case: %s", name)
+	}
+}
+
 type ValidateMoveTest struct {
 	epd  string
 	move string
@@ -429,9 +472,14 @@ func TestValidatePseudoLegalMove(t *testing.T) {
 			epd:  "4k3/8/8/8/8/8/1pR5/4K3 w - - 0 1 ac 33",
 			move: "c2a2",
 		},
-		"elephant short rampage": {
+		"rampage stops short": {
 			epd:  "4k3/8/8/8/8/2p5/2R5/4K3 w - - 0 1 ac 33",
 			move: "c2c3",
+			err:  IllegalRampageError,
+		},
+		"rampage kills own king": {
+			epd:  "4k3/8/8/8/8/8/8/4K2R w K - 0 1 ac 33",
+			move: "h1e1",
 			err:  IllegalRampageError,
 		},
 		"illegal elephant capture": {
@@ -446,6 +494,38 @@ func TestValidatePseudoLegalMove(t *testing.T) {
 		move, err := ParseUci(config.move)
 		require.NoError(t, err, "Move: %s  Name: %s", config.move, name)
 		err = game.ValidatePseudoLegalMove(move)
+		if config.err != nil {
+			assert.EqualError(t, err, config.err.Error(), "Case: %s", name)
+		} else {
+			assert.NoError(t, err, "Case: %s", name)
+		}
+	}
+}
+
+func TestValidateLegalMove(t *testing.T) {
+	cases := map[string]ValidateMoveTest{
+		"legal move": {
+			epd:  "4k3/4p3/8/8/8/8/8/4K3 b - - 0 1 cc 33",
+			move: "e7e5",
+			err:  nil,
+		},
+		"not pseudo legal": {
+			epd:  "4k3/8/8/8/8/8/8/4K3 b - - 0 1 nn 33",
+			move: "0000",
+			err:  IllegalPassError,
+		},
+		"into check": {
+			epd:  "3rk3/8/8/8/8/8/8/4K3 w - - 0 1 nn 33",
+			move: "e1d1",
+			err:  MoveIntoCheckError,
+		},
+	}
+	for name, config := range cases {
+		game, err := ParseEpd(config.epd)
+		require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
+		move, err := ParseUci(config.move)
+		require.NoError(t, err, "Move: %s  Name: %s", config.move, name)
+		err = game.ValidateLegalMove(move)
 		if config.err != nil {
 			assert.EqualError(t, err, config.err.Error(), "Case: %s", name)
 		} else {

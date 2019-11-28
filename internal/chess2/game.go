@@ -212,6 +212,23 @@ func (g *Game) updateGameState() {
 	// TODO - decide if the game is over
 }
 
+// IsInCheck determines if the given player is currently in check, regardless of
+// if they are the player to move. If the game is over due to checkmate, this
+// method will return true for the losing player.
+func (g *Game) IsInCheck(color Color) bool {
+	otherArmy := g.armies[ColorIdx(OtherColor(color))]
+	kingMask := g.board.colorMask(color) & g.board.pieceMask(TypeKing)
+	enemyMask := g.board.colorMask(OtherColor(color))
+	if otherArmy == ArmyAnimals {
+		// Calculate check from elephants separately
+		//enemyMask &^= g.board.pieceMask(TypeRook)
+		// TODO - the color is not in check if a rampage would kill one of the
+		// other color's kings as well.
+	}
+	threatenedMask := g.fullAttackMask(enemyMask)
+	return threatenedMask&kingMask != 0
+}
+
 // GeneratePseudoLegalMoves returns an array of all pseudo-legal moves from the
 // current board state.
 func (g *Game) GeneratePseudoLegalMoves() []Move {
@@ -223,7 +240,6 @@ func (g *Game) GeneratePseudoLegalMoves() []Move {
 }
 
 func (g *Game) generatePseudoLegalMoves(send func(Move)) {
-
 	fromMask := g.board.colorMask(g.toMove)
 	eachSquareInMask(fromMask, func(from Square) {
 		mask := g.attackMask(from)
@@ -560,7 +576,7 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 		if attackedKings != 0 {
 			return IllegalCaptureError
 		}
-		return validateNoDuels(move, TooManyDuelsError)
+		return validateNoDuels(move, NotDuelableError)
 	}
 
 	// Check valid sliding attack
@@ -569,6 +585,9 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 	}
 
 	// Check captures
+	// noncapturableMask is the mask of pieces that cannot be captured by the
+	// moving piece. In the case of an elephant, noncapturableMask is the
+	// mask of pieces that can stop a rampage.
 	noncapturableMask := MaskEmpty
 	if piece.Name() == PieceNameAnimalsKnight {
 		// Cannot capture own king
@@ -628,6 +647,10 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 				}
 			}
 		}
+		if attemptedCapturesMask&g.board.colorMask(piece.Color())&g.board.pieceMask(TypeKing) != 0 {
+			// Cannot capture own king
+			return IllegalRampageError
+		}
 	}
 
 	return g.ValidateDuels(move)
@@ -638,6 +661,23 @@ func validateNoDuels(move Move, err error) error {
 		if d.IsStarted() {
 			return err
 		}
+	}
+	return nil
+}
+
+// ValidateLegalMove returns an error describing why the given move is not
+// legal.
+//
+// - A move is "into check" if it leaves the board in a state where any of the
+//   player's kings are threatened.
+// - A move is "legal" if it is pseudo-legal and not into check.
+func (g *Game) ValidateLegalMove(move Move) error {
+	if err := g.ValidatePseudoLegalMove(move); err != nil {
+		return err
+	}
+	result := g.ApplyMove(move)
+	if result.IsInCheck(g.toMove) {
+		return MoveIntoCheckError
 	}
 	return nil
 }
@@ -713,8 +753,6 @@ func (g *Game) attackMask(from Square) uint64 {
 		return diagAttackMask[from.Address][diag] & dist2Mask[from.Address]
 	case PieceNameAnimalsRook:
 		return orthAttackMask[from.Address][0] & dist3Mask[from.Address]
-		// TODO - if there's a possible duel for the defender to kill the
-		// elephant, the threat mask should end at that point.
 	default:
 		panic("Invalid piece type")
 	}
@@ -731,12 +769,7 @@ func (g *Game) fullAttackMask(from uint64) (result uint64) {
 // legal.
 func (g *Game) ValidateDuels(move Move) error {
 	if move.IsDrop() || move.IsPass() {
-		for _, d := range move.Duels {
-			if d.IsStarted() {
-				return TooManyDuelsError
-			}
-		}
-		return nil
+		return validateNoDuels(move, TooManyDuelsError)
 	}
 
 	p, _ := g.board.PieceAt(move.From)
@@ -770,17 +803,14 @@ func eachSquareInMask(mask uint64, f func(Square)) {
 }
 
 func requiredCastlingRight(color Color, isQueenside bool) uint64 {
-	switch color {
-	case ColorWhite:
+	if color == ColorWhite {
 		if isQueenside {
 			return castleWhiteQueenside
 		}
 		return castleWhiteKingside
-	case ColorBlack:
-		if isQueenside {
-			return castleBlackQueenside
-		}
-		return castleBlackKingside
 	}
-	return 0
+	if isQueenside {
+		return castleBlackQueenside
+	}
+	return castleBlackKingside
 }
