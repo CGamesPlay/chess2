@@ -8,4 +8,4 @@ test:
 
 .PHONY: perft
 perft: install
-	cat test/chess2_perft.epd | chess2_perft -d 2 -b
+	cat test/chess2_perft.epd | chess2_perft -d 3 -b

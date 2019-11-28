@@ -342,8 +342,8 @@ func TestValidatePseudoLegalMove(t *testing.T) {
 			epd:  "4k3/8/8/8/8/8/8/3qK3 w - - 0 1 cn 33",
 			move: "e1d1",
 		},
-		"illegal capture of nemesis rook": {
-			epd:  "4k3/8/8/8/8/8/8/3rK3 w - - 0 1 cn 33",
+		"illegal capture of reaper rook": {
+			epd:  "4k3/8/8/8/8/8/8/3rK3 w - - 0 1 cr 33",
 			move: "e1d1",
 			err:  IllegalCaptureError,
 		},
@@ -462,6 +462,11 @@ func TestValidatePseudoLegalMove(t *testing.T) {
 		},
 		"illegal castle through check": {
 			epd:  "3rk3/8/8/8/8/8/8/R3K3 w Q - 0 1 cc 33",
+			move: "e1c1",
+			err:  IllegalCastleError,
+		},
+		"illegal castle from check": {
+			epd:  "4k3/4r3/8/8/8/8/8/R3K3 w Q - 0 1 cc 33",
 			move: "e1c1",
 			err:  IllegalCastleError,
 		},

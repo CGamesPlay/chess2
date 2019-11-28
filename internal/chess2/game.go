@@ -489,7 +489,8 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 		if piece.Type() != TypePawn ||
 			move.To.Mask()&lastRank == 0 ||
 			move.Piece.Type() == TypePawn ||
-			move.Piece.Type() == TypeKing {
+			move.Piece.Type() == TypeKing ||
+			move.Piece.Type() == TypeQueen && piece.Army() == ArmyTwoKings {
 			return IllegalPromotionError
 		}
 	} else if piece.Type() == TypePawn && move.To.Mask()&lastRank != 0 {
@@ -560,10 +561,12 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 			if g.board.occupiedMask()&firstRank != 0 {
 				return IllegalCastleError
 			}
-			checkSq := Square{Address: move.From.Address + uint8(diff/2)}
+			checkMask := Square{Address: move.From.Address + uint8(diff/2)}.Mask()
+			checkMask |= move.From.Mask()
+			checkMask |= move.To.Mask()
 			threats := g.board.colorMask(OtherColor(piece.Color()))
 			threatenedMask := g.fullAttackMask(threats)
-			if threatenedMask&checkSq.Mask() != 0 {
+			if threatenedMask&checkMask != 0 {
 				return IllegalCastleError
 			}
 			return validateNoDuels(move, NotDuelableError)
@@ -607,8 +610,8 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 			// Cannot capture nemesis queen
 			noncapturableMask |= colorPieces & g.board.pieceMask(TypeQueen)
 		}
-		if army == ArmyNemesis {
-			// Cannot capture nemesis rook
+		if army == ArmyReaper {
+			// Cannot capture reaper rook
 			noncapturableMask |= colorPieces & g.board.pieceMask(TypeRook)
 		}
 		if army == ArmyAnimals {
