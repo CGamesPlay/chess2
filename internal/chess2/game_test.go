@@ -374,6 +374,11 @@ func TestValidatePseudoLegalMove(t *testing.T) {
 			move: "e2e3",
 			err:  IllegalCaptureError,
 		},
+		"illegal pawn capture": {
+			epd:  "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1 cc 33",
+			move: "e2d3",
+			err:  UnreachableSquareError,
+		},
 		"pawn move backwards": {
 			epd:  "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1 cc 33",
 			move: "e2e1",
@@ -385,17 +390,17 @@ func TestValidatePseudoLegalMove(t *testing.T) {
 		},
 		"illegal nemesis move": {
 			epd:  "4k3/8/8/8/8/8/3P4/4K3 w - - 0 1 nc 33",
-			move: "d2c2",
+			move: "d2c3",
 			err:  UnreachableSquareError,
 		},
 		"legal nemesis move": {
 			epd:  "4k3/8/8/8/8/8/3P4/4K3 w - - 0 1 nc 33",
-			move: "d2e2",
+			move: "d2e3",
 		},
 		"illegal capturing nemesis move": {
 			epd:  "4k3/8/8/8/8/8/3Pp3/4K3 w - - 0 1 nc 33",
 			move: "d2e2",
-			err:  IllegalCaptureError,
+			err:  UnreachableSquareError,
 		},
 		"pawn double move capture": {
 			epd:  "4k3/8/8/8/4p3/8/4P3/4K3 w - - 0 1 cc 33",
@@ -468,6 +473,10 @@ func TestValidatePseudoLegalMove(t *testing.T) {
 			epd:  "4k3/8/8/8/RnpP4/8/8/4K3 w KQkq - 0 1 ac 33",
 			move: "a4d4",
 		},
+		"elephant normal move": {
+			epd:  "4k3/8/8/8/8/8/8/4K2R w KQkq - 0 1 ac 33",
+			move: "h1f1",
+		},
 		"rampage at left": {
 			epd:  "4k3/8/8/8/8/8/1pR5/4K3 w - - 0 1 ac 33",
 			move: "c2a2",
@@ -486,6 +495,10 @@ func TestValidatePseudoLegalMove(t *testing.T) {
 			epd:  "4k3/8/8/8/Rn6/8/8/4K3 w KQkq - 0 1 ac 33",
 			move: "a4b4",
 			err:  IllegalRampageError,
+		},
+		"ghost move": {
+			epd:  "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 rc 33",
+			move: "a1f6",
 		},
 	}
 	for name, config := range cases {

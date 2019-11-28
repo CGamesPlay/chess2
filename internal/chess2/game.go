@@ -526,7 +526,8 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 			} else if move.To == g.epSquare {
 				return g.ValidateDuels(move)
 			}
-		} else if piece.Army() == ArmyNemesis {
+		}
+		if piece.Army() == ArmyNemesis && !targetOccupied {
 			// Check for nemesis move
 			mask := singleStepMask(move.From, g.board.pieceMask(TypeKing)&g.board.colorMask(OtherColor(piece.Color())))
 			if move.To.Mask()&mask == 0 {
@@ -535,6 +536,9 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 				return IllegalCaptureError
 			}
 			return validateNoDuels(move, TooManyDuelsError)
+		}
+		if !targetOccupied {
+			return UnreachableSquareError
 		}
 		// Otherwise normal sliding attack rules apply
 	}
@@ -612,16 +616,23 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 			noncapturableMask |= colorPieces & g.board.pieceMask(TypeRook) & ^dist2Mask[move.From.Address]
 		}
 	}
-	attemptedCapturesMask := betweenMask[move.From.Address][move.To.Address] | move.To.Mask()
-	if piece.Name() != PieceNameAnimalsRook && attemptedCapturesMask&noncapturableMask != 0 {
+	// visitedSquares is a mask of squares visited by the move. Generally these
+	// need to be empty, except for the last one, for the move to be valid.
+	visitedSquares := move.To.Mask()
+	if piece.Name() != PieceNameReaperRook && piece.Name() != PieceNameReaperQueen {
+		// These pieces attack each square they pass through
+		visitedSquares |= betweenMask[move.From.Address][move.To.Address]
+	}
+	if piece.Name() != PieceNameAnimalsRook && visitedSquares&noncapturableMask != 0 {
 		return IllegalCaptureError
 	}
 
-	if piece.Name() == PieceNameAnimalsRook && attemptedCapturesMask != 0 {
+	if piece.Name() == PieceNameAnimalsRook {
 		diff := int(move.To.Address) - int(move.From.Address)
-		if SquareDistance(move.From, move.To) < 3 {
+		if SquareDistance(move.From, move.To) < 3 && visitedSquares&g.board.occupiedMask() != 0 {
 			// Moving less than 3 spaces is only allowed if the elephant hits a
-			// noncapturable piece or the edge of the board.
+			// noncapturable piece or the edge of the board, or if all of the
+			// spaces are empty.
 			var step int
 			var hitWall bool
 			if diff <= -8 {
@@ -647,7 +658,7 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 				}
 			}
 		}
-		if attemptedCapturesMask&g.board.colorMask(piece.Color())&g.board.pieceMask(TypeKing) != 0 {
+		if visitedSquares&g.board.colorMask(piece.Color())&g.board.pieceMask(TypeKing) != 0 {
 			// Cannot capture own king
 			return IllegalRampageError
 		}
