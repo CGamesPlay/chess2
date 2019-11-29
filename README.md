@@ -25,3 +25,13 @@ make test
 ## TODO
 
 The engine presently incorrectly considers a color in check if an enemy elephant could capture the king, even if that capture is illegal because the rampage would capture the enemy's king.
+
+## Performance tests
+
+Here are the timings for `chess2_perft` at depth 3.
+
+| Configuration          | Speed  | Relative |
+| ---------------------- | ------ | -------- |
+| Python engine          | 636.73 | 1.00000  |
+| Go engine, brute force | 21.20  | 0.03330  |
+| Go engine, fast        | 3.92   | 0.00616  |

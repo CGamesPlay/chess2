@@ -25,7 +25,8 @@ var (
 	}
 )
 
-// A Square represents a location on the board.
+// A Square represents a location on the board. Squares are numbered from the
+// top left square (A8), moving right, then down.
 type Square struct {
 	Address uint8
 }

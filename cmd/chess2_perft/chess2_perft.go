@@ -69,7 +69,7 @@ func runPerft(input string) (string, error) {
 	if bruteforce {
 		result = chess2.PerftBruteforce(game, maxDepth)
 	} else {
-		return fmt.Error("not implemented")
+		result = chess2.Perft(game, maxDepth)
 	}
 	for i := 0; i < len(checkValues) && i < maxDepth; i++ {
 		if checkValues[i] != result[i] {

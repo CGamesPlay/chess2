@@ -229,24 +229,95 @@ func (g *Game) IsInCheck(color Color) bool {
 	return threatenedMask&kingMask != 0
 }
 
-// GeneratePseudoLegalMoves returns an array of all pseudo-legal moves from the
-// current board state.
-func (g *Game) GeneratePseudoLegalMoves() []Move {
+// GenerateLegalMoves returns an array of all legal moves from the current board
+// state.
+func (g *Game) GenerateLegalMoves() []Move {
 	var results []Move
-	g.generatePseudoLegalMoves(func(m Move) {
-		results = append(results, m)
+	g.generateMoves(func(m Move) {
+		if err := g.ValidateLegalMove(m); err == nil {
+			results = append(results, m)
+		}
 	})
 	return results
 }
 
-func (g *Game) generatePseudoLegalMoves(send func(Move)) {
+// As generateMovesFrom, but for every square on the game board.
+func (g *Game) generateMoves(send func(Move)) {
 	fromMask := g.board.colorMask(g.toMove)
+	if g.kingTurn {
+		fromMask &= g.board.pieceMask(TypeKing)
+		send(MovePass)
+	}
 	eachSquareInMask(fromMask, func(from Square) {
-		mask := g.attackMask(from)
-		eachSquareInMask(mask, func(to Square) {
-			send(Move{From: from, To: to})
-		})
+		g.generateMovesFrom(from, send)
 	})
+}
+
+// Generates a superset of pseudo-legal moves originating from the given square.
+// The returned set includes all pseudo-legal moves from this game state, but
+// may include illegal moves as well. Each move will only be sent once.
+func (g *Game) generateMovesFrom(from Square, sendOne func(Move)) {
+	piece, found := g.board.PieceAt(from)
+	piece = piece.WithArmy(g.armies[ColorIdx(piece.Color())])
+	if !found {
+		return
+	}
+
+	lastRank := MaskRank[7*ColorIdx(piece.Color())]
+	// send the move, but enumerate all possible promotions if there are any
+	send := func(move Move) {
+		if piece.Type() == TypePawn && move.To.Mask()&lastRank != 0 {
+			for t := range basicTypeNames {
+				move.Piece = NewPiece(t, ArmyNone, ColorWhite)
+				sendOne(move)
+			}
+		} else {
+			sendOne(move)
+		}
+	}
+
+	// Cover all normal sliding attacks
+	attackMask := g.attackMask(from)
+	eachSquareInMask(attackMask, func(to Square) {
+		send(Move{From: from, To: to})
+	})
+
+	if piece.Type() == TypePawn {
+		if piece.Army() == ArmyNemesis {
+			// Nemesis moves
+			for y := -1; y <= 1; y++ {
+				if from.Y()+y < 0 || from.Y()+y > 7 {
+					continue
+				}
+				for x := -1; x <= 1; x++ {
+					if from.X()+x < 0 || from.X()+x > 7 {
+						continue
+					}
+					to := SquareFromCoords(from.X()+x, from.Y()+y)
+					if to.Mask()&attackMask == 0 {
+						send(Move{From: from, To: to})
+					}
+				}
+			}
+		} else {
+			// Pawn advancement
+			sign := ColorIdx(piece.Color())*2 - 1
+			for n := 1; n <= 2; n++ {
+				y := from.Y() + sign*n
+				if y >= 0 && y < 8 {
+					send(Move{From: from, To: SquareFromCoords(from.X(), y)})
+				}
+			}
+		}
+	} else if piece.Name() == PieceNameClassicKing {
+		// Castling
+		if from.X() == 4 {
+			send(Move{From: from, To: SquareFromCoords(from.X()-2, from.Y())})
+			send(Move{From: from, To: SquareFromCoords(from.X()+2, from.Y())})
+		}
+	} else if piece.Name() == PieceNameTwoKingsKing {
+		send(Move{From: from, To: from})
+	}
 }
 
 // ApplyMove clones the receiver, applies the given move to the clone, and

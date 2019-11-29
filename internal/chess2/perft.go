@@ -4,8 +4,15 @@ var promotions = []PieceType{TypeNone, TypeQueen, TypeRook, TypeBishop, TypeKnig
 
 // Perft returns the number of valid sequences of moves of length depth from the
 // given game. Challenges are never issued while counting moves.
-func Perft(game Game, depth int) uint64 {
-	panic("not implemented")
+func Perft(game Game, depth int) []uint64 {
+	if depth <= 0 {
+		return make([]uint64, 0)
+	}
+	results := make([]uint64, depth)
+	doPerft(game, depth, results, func(g Game) []Move {
+		return g.GenerateLegalMoves()
+	})
+	return results
 }
 
 // PerftBruteforce is similar to Perft, except that it generates the moves by
