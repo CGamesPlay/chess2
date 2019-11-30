@@ -81,6 +81,13 @@ func setupRouter() *gin.Engine {
 		}
 		nextGame := game.ApplyMove(move)
 		response := formatGame(nextGame)
+		duels := game.GenerateDuels(move)
+		// Strip off the first item, which is always "don't initiate a duel"
+		duelsStr := make([]string, len(duels)-1)
+		for i := 1; i < len(duels); i++ {
+			duelsStr[i-1] = duels[i].String()[4:]
+		}
+		response["available_duels"] = duelsStr
 		c.JSON(http.StatusOK, response)
 	})
 	return r

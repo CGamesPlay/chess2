@@ -325,6 +325,52 @@ func (g *Game) generateMovesFrom(from Square, sendOne func(Move)) {
 	}
 }
 
+// GenerateDuels returns an array of Moves based on the given move,
+// corresponding to every legal combination of duels. The existing duels on the
+// move are ignored. The duels returns by this method always choose to gain a
+// stone when calling a bluff, but choosing to have the opponent lose a stone is
+// always also valid.
+func (g *Game) GenerateDuels(move Move) []Move {
+	var results []Move
+	g.generateDuels(move, func(m Move) {
+		results = append(results, m)
+	})
+	return results
+}
+
+// Generates all legal duels that are available from the given move.
+func (g *Game) generateDuels(move Move, send func(Move)) {
+	enumerateDuels(move, 2, func(move Move) {
+		if err := g.ValidateDuels(move); err == TooManyDuelsError {
+			return
+		}
+		enumerateDuels(move, 1, func(move Move) {
+			if err := g.ValidateDuels(move); err == TooManyDuelsError {
+				return
+			}
+			enumerateDuels(move, 0, func(move Move) {
+				if err := g.ValidateDuels(move); err == nil {
+					send(move)
+				}
+			})
+		})
+	})
+}
+
+func enumerateDuels(move Move, num int, send func(Move)) {
+	// Don't initiate the duel. Important that this happens first due to
+	// short-circuiting in the generateDuels method.
+	move.Duels[num] = Duel{}
+	send(move)
+	// All possible duels/responses
+	for challenge := 0; challenge < 3; challenge++ {
+		for response := 0; response < 3; response++ {
+			move.Duels[num] = NewDuel(challenge, response, true)
+			send(move)
+		}
+	}
+}
+
 // ApplyMove clones the receiver, applies the given move to the clone, and
 // returns the clone. It does not validate that the move is legal, and if an
 // illegal move is made the resulting Game may not be in a valid state.
@@ -492,7 +538,7 @@ func (g *Game) handleCapture(attacker Piece, target Square, me *moveExecution) b
 	}
 	if len(me.duels) > 0 {
 		if d := me.duels[0]; d.IsStarted() {
-			if (attacker.Type() == TypeKing || defender.Type() == TypeKing) && me.err == nil {
+			if (attacker.Type() == TypeKing || defender.Type() == TypeKing || attacker.Color() == defender.Color()) && me.err == nil {
 				me.err = NotDuelableError
 			}
 			if DuelingRank(attacker.Type()) < DuelingRank(defender.Type()) {
@@ -774,7 +820,9 @@ func (g *Game) ValidateLegalMove(move Move) error {
 
 // attackMask returns the mask of threatened squares from the given square.
 // A square which is reachable but not threatened is not included in this mask
-// (e.g. pawns advancing).
+// (e.g. pawns advancing). This method will always return all squares which
+// might be captured from the piece at the given square, but may return squares
+// that would not constitute a legal move.
 func (g *Game) attackMask(from Square) uint64 {
 	piece, found := g.board.PieceAt(from)
 	if !found {

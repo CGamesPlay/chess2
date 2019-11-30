@@ -583,6 +583,11 @@ func TestValidateDuels(t *testing.T) {
 			move: "e1e2:22",
 			err:  NotDuelableError,
 		},
+		"capturing own piece": {
+			epd:  "4k3/8/8/8/8/8/3P4/1N2K3 w - - 0 1 ac 33",
+			move: "b1d2:22",
+			err:  NotDuelableError,
+		},
 	}
 	for name, config := range cases {
 		game, err := ParseEpd(config.epd)
@@ -748,5 +753,62 @@ func TestApplyMove(t *testing.T) {
 		after := before.ApplyMove(move)
 		result := EncodeEpd(after)
 		assert.Equal(t, config.after, result, "Case: %s", name)
+	}
+}
+
+func TestGenerateDuels(t *testing.T) {
+	cases := map[string]struct {
+		epd   string
+		move  string
+		duels []string
+	}{
+		"basic pawn capture": {
+			epd:   "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1 cc 33",
+			move:  "e4d5",
+			duels: []string{"", ":00+", ":01", ":02", ":10+", ":11", ":12", ":20+", ":21", ":22"},
+		},
+		"capturing own piece": {
+			epd:   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ac 33",
+			move:  "b1d2",
+			duels: []string{""},
+		},
+		"capturing with king": {
+			epd:   "rnbqkb1r/pppppppp/8/8/4nK2/4P3/PPPP1PPP/RNBQ1BNR w KQkq - 0 1 kc 33",
+			move:  "f4e4",
+			duels: []string{""},
+		},
+		"elephant rampage kills own piece": {
+			epd:   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ac 33",
+			move:  "h1h4",
+			duels: []string{""},
+		},
+		"elephant rampage": {
+			epd:  "rnbqk3/pppppppp/4bnr1/8/4R3/8/PPPPPPP1/RNBQKBN1 w KQkq - 0 1 ac 66",
+			move: "e4e7",
+			duels: []string{"", ":00+", ":01", ":02", ":10+", ":11", ":12",
+				":20+", ":21", ":22", "::00+", ":00+:00+", ":01:00+", ":02:00+",
+				":11:00+", ":12:00+", ":22:00+", "::01", ":00+:01", ":01:01",
+				":02:01", ":11:01", ":12:01", ":22:01", "::02", ":00+:02",
+				":01:02", ":02:02", ":11:02", ":12:02", ":22:02", "::10+",
+				":00+:10+", ":01:10+", ":02:10+", ":11:10+", ":12:10+",
+				":22:10+", "::11", ":00+:11", ":01:11", ":02:11", ":11:11",
+				":12:11", ":22:11", "::12", ":00+:12", ":01:12", ":02:12",
+				":11:12", ":12:12", ":22:12", "::20+", ":00+:20+", ":01:20+",
+				":02:20+", ":11:20+", ":12:20+", ":22:20+", "::21", ":00+:21",
+				":01:21", ":02:21", ":11:21", ":12:21", ":22:21", "::22",
+				":00+:22", ":01:22", ":02:22", ":11:22", ":12:22", ":22:22"},
+		},
+	}
+	for name, config := range cases {
+		game, err := ParseEpd(config.epd)
+		require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
+		move, err := ParseUci(config.move)
+		require.NoError(t, err, "Move: %s  Name: %s", config.move, name)
+		duels := game.GenerateDuels(move)
+		duelsStr := make([]string, len(duels))
+		for i := 0; i < len(duels); i++ {
+			duelsStr[i] = duels[i].String()[4:]
+		}
+		assert.Equal(t, duelsStr, config.duels, "Case: %s", name)
 	}
 }
