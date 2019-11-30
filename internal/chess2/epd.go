@@ -145,7 +145,7 @@ func ParseEpd(epd string) (Game, error) {
 		game.epSquare = InvalidSquare
 	} else {
 		game.epSquare = SquareFromName(epStr)
-		if game.epSquare == InvalidSquare {
+		if game.epSquare == InvalidSquare || game.epSquare.Y() != 2 && game.epSquare.Y() != 5 {
 			return Game{}, ParseError("EPD has invalid en passant square")
 		}
 	}

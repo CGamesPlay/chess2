@@ -27,6 +27,7 @@ make test perft
   - the target square is empty or contains a capturable piece; and
   - all duels are legal.
   - Additionally, a pass move is pseudo-legal during a king turn.
+- A piece is "threatened" if there is a pseudo-legal move which results in the capture of the piece.
 - A move is "into check" if it leaves the board in a state where any of the player's kings are threatened.
 - A move is "legal" if it is pseudo-legal and not into check.
 

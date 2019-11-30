@@ -7,6 +7,51 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestUpdateGameStatus(t *testing.T) {
+	cases := map[string]struct {
+		epd   string
+		state GameState
+	}{
+		"normal game": {
+			epd:   "4k3/8/4bnr1/8/4R3/8/PPPPPPP1/RNBQKBN1 w - - 0 1 cc 33",
+			state: GameInProgress,
+		},
+		"white midline victory": {
+			epd:   "4k3/8/8/4K3/8/8/8/8 b - - 0 1 cc 33",
+			state: GameOverWhite,
+		},
+		"black midline victory": {
+			epd:   "8/8/8/8/4k3/8/8/4K3 w - - 0 1 cc 33",
+			state: GameOverBlack,
+		},
+		"one king behind midline": {
+			epd:   "4k3/8/8/3K4/8/8/8/4K3 b - - 0 1 kc 33",
+			state: GameInProgress,
+		},
+		"two kings midline victory": {
+			epd:   "4k3/8/8/3KK3/8/8/8/8 b - - 0 1 kc 33",
+			state: GameOverWhite,
+		},
+		"checkmate black": {
+			epd:   "8/8/8/7k/6QR/8/8/4K3 b - - 0 1 cc 33",
+			state: GameOverWhite,
+		},
+		"stalemate black": {
+			epd:   "4k3/8/3R1Q2/8/8/8/8/4K3 b - - 0 1 cc 33",
+			state: GameOverWhite,
+		},
+		"fifty move rule": {
+			epd:   "4k3/8/8/8/8/8/8/4K3 w - - 50 25 cc 33",
+			state: GameOverDraw,
+		},
+	}
+	for name, config := range cases {
+		game, err := ParseEpd(config.epd)
+		require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
+		assert.Equal(t, game.GameState(), config.state, "Case: %s", name)
+	}
+}
+
 func TestSingleStepMask(t *testing.T) {
 	cases := []struct {
 		pair    string

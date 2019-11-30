@@ -115,6 +115,10 @@ var (
 	// Masks describing the files that have to be empty for a castle.
 	queensideMask = uint64(0x0e0e0e0e0e0e0e0e)
 	kingsideMask  = uint64(0x6060606060606060)
+
+	// Masks describing the area past the midline for each color
+	whiteMidline = uint64(0x00000000ffffffff)
+	blackMidline = uint64(0xffffffff00000000)
 )
 
 func buildBetweenMask() (results [64][64]uint64) {
@@ -214,7 +218,22 @@ func (g *Game) GameState() GameState {
 }
 
 func (g *Game) updateGameState() {
-	// TODO - decide if the game is over
+	if g.board.pieceMask(TypeKing) & ^whiteMidline == 0 {
+		// White has won by moving all kings past the midline
+		g.gameState = GameOverWhite
+	} else if g.board.pieceMask(TypeKing) & ^blackMidline == 0 {
+		// Black has won by moving all kings past the midline
+		g.gameState = GameOverBlack
+	} else if g.halfmoveClock >= 50 {
+		// Draw via fifty move rule
+		g.gameState = GameOverDraw
+	} else if !g.hasLegalMoves() {
+		if g.toMove == ColorWhite {
+			g.gameState = GameOverBlack
+		} else {
+			g.gameState = GameOverWhite
+		}
+	}
 }
 
 // IsInCheck determines if the given player is currently in check, regardless of
@@ -244,6 +263,27 @@ func (g *Game) GenerateLegalMoves() []Move {
 		}
 	})
 	return results
+}
+
+// Returns true if there are any legal moves in the current game state. Used to
+// check for checkmate/stalemate.
+func (g *Game) hasLegalMoves() (result bool) {
+	// We use a panic here to abort the enumeration of moves early.
+	result = false
+	defer func() {
+		r := recover()
+		if r == "legal moves exist" {
+			result = true
+		} else if r != nil {
+			panic(r)
+		}
+	}()
+	g.generateMoves(func(m Move) {
+		if g.ValidateLegalMove(m) == nil {
+			panic("legal moves exist")
+		}
+	})
+	return
 }
 
 // As generateMovesFrom, but for every square on the game board.
@@ -375,15 +415,18 @@ func enumerateDuels(move Move, num int, send func(Move)) {
 // returns the clone. It does not validate that the move is legal, and if an
 // illegal move is made the resulting Game may not be in a valid state.
 func (g *Game) ApplyMove(move Move) Game {
-	return applyMoveTo(g, move)
+	clone := *g
+	clone.applyMove(move)
+	clone.updateGameState()
+	return clone
 }
 
-func applyMoveTo(old *Game, move Move) Game {
-	g := *old
+// Applies the move in-place.
+func (g *Game) applyMove(move Move) {
 	if move.IsDrop() {
 		p := move.Piece.WithArmy(g.armies[ColorIdx(move.Piece.Color())])
 		g.board.SetPieceAt(move.To, p)
-		return g
+		return
 	}
 
 	// Advance turn
@@ -404,7 +447,7 @@ func applyMoveTo(old *Game, move Move) Game {
 	}
 
 	if move.IsPass() {
-		return g
+		return
 	}
 
 	// Handle captures and duels
@@ -467,13 +510,14 @@ func applyMoveTo(old *Game, move Move) Game {
 	if isZeroingMove {
 		g.halfmoveClock = 0
 	}
+	// Clear castling right on rook move
 	for _, mask := range castles {
 		if move.From.Mask()&mask != 0 {
 			g.castlingRights &^= mask
 		}
 	}
 
-	return g
+	return
 }
 
 func (g *Game) handleAllCaptures(p Piece, move Move, me *moveExecution) bool {
@@ -811,8 +855,9 @@ func (g *Game) ValidateLegalMove(move Move) error {
 	if err := g.ValidatePseudoLegalMove(move); err != nil {
 		return err
 	}
-	result := g.ApplyMove(move)
-	if result.IsInCheck(g.toMove) {
+	clone := *g
+	clone.applyMove(move)
+	if clone.IsInCheck(g.toMove) {
 		return MoveIntoCheckError
 	}
 	return nil
