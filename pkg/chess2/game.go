@@ -37,10 +37,10 @@ const (
 )
 
 var (
-	castleWhiteKingside  = SquareFromName("H1").Mask()
-	castleWhiteQueenside = SquareFromName("A1").Mask()
-	castleBlackKingside  = SquareFromName("H8").Mask()
-	castleBlackQueenside = SquareFromName("A8").Mask()
+	castleWhiteKingside  = SquareFromName("H1").mask()
+	castleWhiteQueenside = SquareFromName("A1").mask()
+	castleBlackKingside  = SquareFromName("H8").mask()
+	castleBlackQueenside = SquareFromName("A8").mask()
 	castleKingside       = castleWhiteKingside | castleBlackKingside
 	castleQueenside      = castleWhiteQueenside | castleBlackQueenside
 	castles              = []uint64{castleWhiteKingside, castleWhiteQueenside, castleBlackKingside, castleBlackQueenside}
@@ -62,8 +62,8 @@ func buildSlidingAttackMask(sqStart Square, mask uint64, deltas []int) uint64 {
 				// Dont wrap around edges
 				break
 			}
-			results |= sq.Mask()
-			if mask&sq.Mask() != 0 {
+			results |= sq.mask()
+			if mask&sq.mask() != 0 {
 				break
 			}
 		}
@@ -77,7 +77,7 @@ func buildSlidingAttackMaskAll(deltas []int) [64]uint64 {
 	var results [64]uint64
 	for startAddr := range results {
 		sqStart := Square{Address: uint8(startAddr)}
-		results[startAddr] = buildSlidingAttackMask(sqStart, MaskFull, deltas)
+		results[startAddr] = buildSlidingAttackMask(sqStart, maskFull, deltas)
 	}
 	return results
 }
@@ -90,7 +90,7 @@ func buildSlidingAttackMaskAll(deltas []int) [64]uint64 {
 func buildAttackTable(deltas []int) (maskTable [64]uint64, attackTable [64]map[uint64]uint64) {
 	for startAddr := range maskTable {
 		sqStart := Square{Address: uint8(startAddr)}
-		mask := buildSlidingAttackMask(sqStart, MaskEmpty, deltas)
+		mask := buildSlidingAttackMask(sqStart, maskEmpty, deltas)
 		maskTable[startAddr] = mask
 		attackTable[startAddr] = make(map[uint64]uint64)
 		eachBitSubset64(mask, func(subset uint64) {
@@ -158,7 +158,7 @@ func buildBetweenMask() (results [64][64]uint64) {
 var betweenMask = buildBetweenMask()
 
 func singleStepMask(from Square, toMask uint64) uint64 {
-	mask := MaskEmpty
+	mask := maskEmpty
 	eachSquareInMask(toMask, func(to Square) {
 		dx, dy := to.X()-from.X(), to.Y()-from.Y()
 		if dx < 0 {
@@ -332,10 +332,10 @@ func (g *Game) generateMovesFrom(from Square, sendOne func(Move)) {
 		return
 	}
 
-	lastRank := MaskRank[7*ColorIdx(piece.Color())]
+	lastRank := maskRank[7*ColorIdx(piece.Color())]
 	// send the move, but enumerate all possible promotions if there are any
 	send := func(move Move) {
-		if piece.Type() == TypePawn && move.To.Mask()&lastRank != 0 {
+		if piece.Type() == TypePawn && move.To.mask()&lastRank != 0 {
 			for t := range basicTypeNames {
 				move.Piece = NewPiece(t, ArmyNone, ColorWhite)
 				sendOne(move)
@@ -363,7 +363,7 @@ func (g *Game) generateMovesFrom(from Square, sendOne func(Move)) {
 						continue
 					}
 					to := SquareFromCoords(from.X()+x, from.Y()+y)
-					if to.Mask()&attackMask == 0 {
+					if to.mask()&attackMask == 0 {
 						send(Move{From: from, To: to})
 					}
 				}
@@ -513,7 +513,7 @@ func (g *Game) applyMove(move Move) {
 		}
 	} else if p.Name() == PieceNameClassicKing {
 		// Clear castling rights on king move
-		firstRank := MaskRank[7-7*ColorIdx(p.Color())]
+		firstRank := maskRank[7-7*ColorIdx(p.Color())]
 		g.castlingRights &^= firstRank
 
 		// Move rook when castling
@@ -536,7 +536,7 @@ func (g *Game) applyMove(move Move) {
 	}
 	// Clear castling right on rook move
 	for _, mask := range castles {
-		if move.From.Mask()&mask != 0 {
+		if move.From.mask()&mask != 0 {
 			g.castlingRights &^= mask
 		}
 	}
@@ -674,16 +674,16 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 	}
 
 	// Check promotions
-	lastRank := MaskRank[7*ColorIdx(piece.Color())]
+	lastRank := maskRank[7*ColorIdx(piece.Color())]
 	if move.Piece != InvalidPiece {
 		if piece.Type() != TypePawn ||
-			move.To.Mask()&lastRank == 0 ||
+			move.To.mask()&lastRank == 0 ||
 			move.Piece.Type() == TypePawn ||
 			move.Piece.Type() == TypeKing ||
 			move.Piece.Type() == TypeQueen && piece.Army() == ArmyTwoKings {
 			return IllegalPromotionError
 		}
-	} else if piece.Type() == TypePawn && move.To.Mask()&lastRank != 0 {
+	} else if piece.Type() == TypePawn && move.To.mask()&lastRank != 0 {
 		// Pawns must promote at last rank
 		return IllegalPromotionError
 	}
@@ -721,7 +721,7 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 		if piece.Army() == ArmyNemesis && !targetOccupied {
 			// Check for nemesis move
 			mask := singleStepMask(move.From, g.board.pieceMask(TypeKing)&g.board.colorMask(OtherColor(piece.Color())))
-			if move.To.Mask()&mask == 0 {
+			if move.To.mask()&mask == 0 {
 				return UnreachableSquareError
 			} else if targetOccupied {
 				return IllegalCaptureError
@@ -742,7 +742,7 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 				g.castlingRights&requiredCastlingRight(piece.Color(), diff < 0) == 0 {
 				return IllegalCastleError
 			}
-			firstRank := MaskRank[7-7*ColorIdx(piece.Color())]
+			firstRank := maskRank[7-7*ColorIdx(piece.Color())]
 			if diff < 0 {
 				firstRank &= queensideMask
 			} else {
@@ -751,9 +751,9 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 			if g.board.occupiedMask()&firstRank != 0 {
 				return IllegalCastleError
 			}
-			checkMask := Square{Address: move.From.Address + uint8(diff/2)}.Mask()
-			checkMask |= move.From.Mask()
-			checkMask |= move.To.Mask()
+			checkMask := Square{Address: move.From.Address + uint8(diff/2)}.mask()
+			checkMask |= move.From.mask()
+			checkMask |= move.To.mask()
 			threats := g.board.colorMask(OtherColor(piece.Color()))
 			threatenedMask := g.fullAttackMask(threats)
 			if threatenedMask&checkMask != 0 {
@@ -777,7 +777,7 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 	}
 
 	// Check valid sliding attack
-	if g.attackMask(move.From)&move.To.Mask() == 0 {
+	if g.attackMask(move.From)&move.To.mask() == 0 {
 		return UnreachableSquareError
 	}
 
@@ -785,7 +785,7 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 	// noncapturableMask is the mask of pieces that cannot be captured by the
 	// moving piece. In the case of an elephant, noncapturableMask is the
 	// mask of pieces that can stop a rampage.
-	noncapturableMask := MaskEmpty
+	noncapturableMask := maskEmpty
 	if piece.Name() == PieceNameAnimalsKnight {
 		// Cannot capture own king
 		noncapturableMask |= g.board.colorMask(piece.Color()) & g.board.pieceMask(TypeKing)
@@ -811,7 +811,7 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 	}
 	// visitedSquares is a mask of squares visited by the move. Generally these
 	// need to be empty, except for the last one, for the move to be valid.
-	visitedSquares := move.To.Mask()
+	visitedSquares := move.To.mask()
 	if piece.Name() != PieceNameReaperRook && piece.Name() != PieceNameReaperQueen {
 		// These pieces attack each square they pass through
 		visitedSquares |= betweenMask[move.From.Address][move.To.Address]
@@ -845,7 +845,7 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 				checkAddr := int(move.To.Address) + step
 				if checkAddr >= 0 && checkAddr < 64 {
 					wall := Square{Address: uint8(checkAddr)}
-					if noncapturableMask&wall.Mask() == 0 {
+					if noncapturableMask&wall.mask() == 0 {
 						return IllegalRampageError
 					}
 				}
@@ -932,7 +932,7 @@ func (g *Game) attackMask(from Square) uint64 {
 		return (diagAttackMask[from.Address][diag] | orthAttackMask[from.Address][orth]) & threat
 	case PieceNameEmpoweredBishop, PieceNameEmpoweredKnight, PieceNameEmpoweredRook:
 		// Same-colored adjacent pieces, including the from square.
-		ownAdjacent := (adjacentMask[from.Address] | from.Mask()) & g.board.colorMask(piece.Color())
+		ownAdjacent := (adjacentMask[from.Address] | from.mask()) & g.board.colorMask(piece.Color())
 		mask := uint64(0)
 		if ownAdjacent&g.board.pieceMask(TypeRook) != 0 {
 			orth := orthMask[from.Address] & g.board.occupiedMask()
@@ -947,7 +947,7 @@ func (g *Game) attackMask(from Square) uint64 {
 		}
 		return mask
 	case PieceNameReaperQueen:
-		candidates := ^MaskRank[7*ColorIdx(piece.Color())]
+		candidates := ^maskRank[7*ColorIdx(piece.Color())]
 		kings := g.board.pieceMask(TypeKing) & g.board.colorMask(OtherColor(piece.Color()))
 		return candidates &^ kings
 	case PieceNameReaperRook:

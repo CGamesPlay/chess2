@@ -93,7 +93,7 @@ func TestSingleStepMask(t *testing.T) {
 	for _, config := range cases {
 		move, err := ParseUci(config.pair)
 		require.NoError(t, err, "UCI: %s", config.pair)
-		mask := singleStepMask(move.From, move.To.Mask())
+		mask := singleStepMask(move.From, move.To.mask())
 		results := make([]string, 0, 3)
 		eachSquareInMask(mask, func(sq Square) {
 			results = append(results, sq.String())
@@ -245,9 +245,9 @@ func TestAttackMask(t *testing.T) {
 	for name, config := range cases {
 		game, err := ParseEpd(config.epd)
 		require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
-		fromMask := MaskFull
+		fromMask := maskFull
 		if config.concern != "" {
-			fromMask = SquareFromName(config.concern).Mask()
+			fromMask = SquareFromName(config.concern).mask()
 		}
 		mask := uint64(0)
 		eachSquareInMask(fromMask, func(from Square) {

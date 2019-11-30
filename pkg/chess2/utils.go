@@ -5,9 +5,9 @@ import (
 	"math/bits"
 )
 
-// DumpMask takes a bitmask and returns a string representation of the selected
+// dumpMask takes a bitmask and returns a string representation of the selected
 // bits, as 0 and 1 on 8 lines.
-func DumpMask(mask uint64) string {
+func dumpMask(mask uint64) string {
 	// When rendering, square 0 is the top left
 	mask = bits.Reverse64(mask)
 	return fmt.Sprintf(

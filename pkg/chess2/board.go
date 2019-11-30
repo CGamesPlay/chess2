@@ -5,15 +5,13 @@ import (
 )
 
 const (
-	// MaskEmpty is a mask of an empty board.
-	MaskEmpty = uint64(0)
-	// MaskFull is a mask of an entirely occupied board.
-	MaskFull = ^uint64(0)
+	maskEmpty = uint64(0)
+	maskFull  = ^uint64(0)
 )
 
 var (
-	// MaskRank is a mask of the row at the given y-coordinate.
-	MaskRank = []uint64{
+	// maskRank is a mask of the row at the given y-coordinate.
+	maskRank = []uint64{
 		0x00000000000000ff,
 		0x000000000000ff00,
 		0x0000000000ff0000,
@@ -59,8 +57,7 @@ func SquareFromName(name string) Square {
 	return Square{Address: uint8(y*8 + x)}
 }
 
-// Mask returns a bitmask that selects only this square.
-func (s Square) Mask() uint64 {
+func (s Square) mask() uint64 {
 	return uint64(1 << s.Address)
 }
 
@@ -112,7 +109,7 @@ type Board struct {
 // boolean indicating whether the square is occupied. The returned piece will
 // always have ArmyNone as the Army.
 func (b *Board) PieceAt(s Square) (Piece, bool) {
-	squareMask := s.Mask()
+	squareMask := s.mask()
 	var (
 		color     Color
 		pieceType PieceType
@@ -138,7 +135,7 @@ func (b *Board) PieceAt(s Square) (Piece, bool) {
 // space.
 func (b *Board) SetPieceAt(s Square, p Piece) {
 	b.ClearPieceAt(s)
-	squareMask := s.Mask()
+	squareMask := s.mask()
 	b.colors[ColorIdx(p.Color())] |= squareMask
 	b.pieces[pieceTypeIdx(p.Type())] |= squareMask
 }
@@ -146,7 +143,7 @@ func (b *Board) SetPieceAt(s Square, p Piece) {
 // ClearPieceAt adjusts the receiver to have an empty square at the provided
 // space.
 func (b *Board) ClearPieceAt(s Square) {
-	squareMask := s.Mask()
+	squareMask := s.mask()
 	for i := range b.pieces {
 		b.pieces[i] &= ^squareMask
 	}
