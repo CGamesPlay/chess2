@@ -16,19 +16,27 @@ var (
 	maxDepth   int
 	bruteforce bool
 	classic    bool
+	divide     bool
 )
 
 func main() {
 	pflag.IntVarP(&maxDepth, "depth", "d", 2, "depth for perft")
 	pflag.BoolVarP(&bruteforce, "brute-force", "b", false, "use brute force search")
 	pflag.BoolVar(&classic, "classic", false, "use classic chess rules")
+	pflag.BoolVar(&divide, "divide", false, "split results for first move")
 	pflag.Parse()
 
 	scanner := bufio.NewScanner(os.Stdin)
 	failed := false
 	for scanner.Scan() {
 		epd := scanner.Text()
-		result, err := runPerft(epd)
+		var result string
+		var err error
+		if divide {
+			result, err = dividePerft(epd)
+		} else {
+			result, err = runPerft(epd)
+		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v (epd: %s)\n", err, epd)
 			failed = true
@@ -45,9 +53,63 @@ func main() {
 	}
 }
 
-// runPerft takes in a formatted input string and runs a perft test. The input
-// string is an EPD string, optionally followed by a semicolon and
-// slash-delimited list of numbers, corresponding to the perft at each depth.
+// Parse the epd according to the configured parameters.
+func parseEpd(epd string) (chess2.Game, error) {
+	flags := chess2.VariantChess2
+	usedEpd := epd
+	if classic {
+		flags = chess2.VariantClassic
+		usedEpd += " cc 33"
+	}
+	game, err := chess2.ParseEpdFlags(usedEpd, flags)
+	return game, err
+}
+
+// Output a summary of the perfts for maxDepth-1 for each valid move from the
+// given epd.
+func dividePerft(epd string) (string, error) {
+	game, err := parseEpd(epd)
+	if err != nil {
+		return "", err
+	}
+	var sb strings.Builder
+	sb.WriteString(strings.TrimSpace(epd))
+	sb.WriteRune('\n')
+	if maxDepth < 1 {
+		return sb.String(), nil
+	}
+
+	var moves []chess2.Move
+	if bruteforce {
+		chess2.BruteforceMoveList(func(m chess2.Move) {
+			if err := game.ValidateLegalMove(m); err == nil {
+				moves = append(moves, m)
+			}
+		})
+	} else {
+		moves = game.GenerateLegalMoves()
+	}
+
+	for _, m := range moves {
+		if maxDepth > 1 {
+			child := game.ApplyMove(m)
+			var results []uint64
+			if bruteforce {
+				results = chess2.PerftBruteforce(child, maxDepth-1)
+			} else {
+				results = chess2.Perft(child, maxDepth-1)
+			}
+			sb.WriteString(fmt.Sprintf("%v: %d\n", m, results[maxDepth-2]))
+		} else {
+			sb.WriteString(fmt.Sprintf("%v: 1\n", m))
+		}
+	}
+	return sb.String(), nil
+}
+
+// Take in a formatted input string and run a perft test. The input string is
+// an EPD string, optionally followed by a semicolon and slash-delimited list
+// of numbers, corresponding to the perft at each depth.
 func runPerft(input string) (string, error) {
 	parts := strings.SplitN(input, ";", 2)
 	epd := parts[0]
@@ -64,11 +126,7 @@ func runPerft(input string) (string, error) {
 		}
 	}
 
-	flags := chess2.VariantChess2
-	if classic {
-		flags = chess2.VariantClassic
-	}
-	game, err := chess2.ParseEpdFlags(epd, flags)
+	game, err := parseEpd(epd)
 	if err != nil {
 		return "", err
 	}

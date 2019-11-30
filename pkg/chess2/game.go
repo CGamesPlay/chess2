@@ -534,9 +534,9 @@ func (g *Game) applyMove(move Move) {
 	if isZeroingMove {
 		g.halfmoveClock = 0
 	}
-	// Clear castling right on rook move
+	// Clear castling right on rook move or rook capture
 	for _, mask := range castles {
-		if move.From.mask()&mask != 0 {
+		if move.From.mask()&mask != 0 || move.To.mask()&mask != 0 {
 			g.castlingRights &^= mask
 		}
 	}
