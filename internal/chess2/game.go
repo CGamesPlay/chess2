@@ -9,13 +9,13 @@ type GameState int
 
 const (
 	// GameInProgress means the game is not yet finished.
-	GameInProgress = GameState(0)
+	GameInProgress = GameState(iota)
 	// GameOverWhite means the game is over and white won.
-	GameOverWhite = GameState(1)
+	GameOverWhite
 	// GameOverBlack means the game is over and black won.
-	GameOverBlack = GameState(2)
+	GameOverBlack
 	// GameOverDraw means the game is over and was a draw.
-	GameOverDraw = GameState(3)
+	GameOverDraw
 )
 
 var (
@@ -206,6 +206,11 @@ func GameFromArmies(white, black Army) Game {
 		stones:         [2]int{3, 3},
 		epSquare:       InvalidSquare,
 	}
+}
+
+// GameState returns the current state of the game.
+func (g *Game) GameState() GameState {
+	return g.gameState
 }
 
 func (g *Game) updateGameState() {

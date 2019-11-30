@@ -63,6 +63,13 @@ var (
 	}
 )
 
+// FindArmySymbol takes the EPD symbol for an army and converts it to the proper
+// Army value.
+func FindArmySymbol(symbol rune) (Army, bool) {
+	army, found := symbolToArmy[symbol]
+	return army, found
+}
+
 // EncodeEpd returns the EPD of the given game object
 func EncodeEpd(game Game) string {
 	var sb strings.Builder
@@ -147,7 +154,7 @@ func ParseEpd(epd string) (Game, error) {
 	game.fullmoveNumber--
 
 	for i, symbol := range armyRunes {
-		army, found := symbolToArmy[symbol]
+		army, found := FindArmySymbol(symbol)
 		if !found {
 			return Game{}, ParseError("EPD has invalid armies")
 		}
