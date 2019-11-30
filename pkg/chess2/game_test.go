@@ -760,7 +760,7 @@ func TestApplyMove(t *testing.T) {
 			after:  "4k3/3R4/8/8/8/8/8/4K3 b - - 0 1 ac 63",
 		},
 		"winning challenge": {
-			before: "4k3/8/8/4p3/3P4/8/8/4K3 w - - 0 1 cc 33",
+			before: "4k3/8/8/4p3/3B4/8/8/4K3 w - - 0 1 cc 33",
 			move:   "d4e5:10+",
 			after:  "4k3/8/8/8/8/8/8/4K3 b - - 0 1 cc 42",
 		},
@@ -788,6 +788,11 @@ func TestApplyMove(t *testing.T) {
 			before: "4k3/1P6/8/8/8/8/8/4K3 w - - 0 1 cc 33",
 			move:   "b7b8q",
 			after:  "1Q2k3/8/8/8/8/8/8/4K3 b - - 0 1 cc 33",
+		},
+		"killing pawn in duel grants stone": {
+			before: "4k3/8/8/4p3/3P4/8/8/4K3 w - - 0 1 cc 11",
+			move:   "d4e5:10+",
+			after:  "4k3/8/8/8/8/8/8/4K3 b - - 0 1 cc 21",
 		},
 	}
 	for name, config := range cases {

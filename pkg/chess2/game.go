@@ -634,6 +634,9 @@ func (g *Game) handleCapture(attacker Piece, target Square, me *moveExecution) b
 				}
 			}
 			survived = d.Challenge() <= d.Response()
+			if !survived && attacker.Type() == TypePawn && me.defenderStones < 6 {
+				me.defenderStones++
+			}
 		}
 		me.duels = me.duels[1:]
 	}
