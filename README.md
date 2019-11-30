@@ -1,14 +1,22 @@
-# goengine
+# Chess 2
 
 Chess2 implemented in Go.
 
-To test:
+To start a Chess 2 API server and hit it with a request:
 
 ```bash
-make test
+make serve &
+http -v :8080/new white==c black==k
+http -v :8080/move epd="rnbkkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ck 33" move=d2d4
 ```
 
-#### Interpretation of Chess 2 rules
+To test the engine:
+
+```bash
+make test perft
+```
+
+## Interpretation of Chess 2 rules
 
 - There is a duel each time a move other than a king's captures an opponent's piece. The duel can be skipped, meaning that the defender does not issue a challenge. There can be multiple duels for a single move in the case of an Elephant's rampage.
 - A duel is "legal" if the defender has enough stones to initiate a challenge and pay for their bid; and the attacker has enough stones to pay for their bid.
@@ -22,7 +30,7 @@ make test
 - A move is "into check" if it leaves the board in a state where any of the player's kings are threatened.
 - A move is "legal" if it is pseudo-legal and not into check.
 
-## TODO
+#### Bugs
 
 The engine presently incorrectly considers a color in check if an enemy elephant could capture the king, even if that capture is illegal because the rampage would capture the enemy's king.
 
