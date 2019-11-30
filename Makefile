@@ -5,8 +5,9 @@ install:
 	go install $(PKG)/...
 
 .PHONY: test
-test:
+test: install
 	go test $(PKG)/...
+	./test/json_server.sh
 
 .PHONY: perft
 perft:
