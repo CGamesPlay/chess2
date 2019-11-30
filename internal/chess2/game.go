@@ -18,6 +18,24 @@ const (
 	GameOverDraw
 )
 
+// GameFlags can be used to change the rules of the game.
+type GameFlags uint
+
+const (
+	// GameFlagMidline enables the midline victory condition.
+	GameFlagMidline = GameFlags(1 << iota)
+	// GameFlagStalemate causes stalemates to be treated as a draw instead of a
+	// loss.
+	GameFlagStalemate
+)
+
+const (
+	// VariantChess2 is the default flag configuration for a Chess2 game.
+	VariantChess2 = GameFlagMidline
+	// VariantClassic is the flag configuration for a game of classic Chess.
+	VariantClassic = GameFlagStalemate
+)
+
 var (
 	castleWhiteKingside  = SquareFromName("H1").Mask()
 	castleWhiteQueenside = SquareFromName("A1").Mask()
@@ -179,6 +197,7 @@ type moveExecution struct {
 
 // A Game fully describes a Chess 2 game.
 type Game struct {
+	flags          GameFlags
 	board          Board
 	castlingRights uint64
 	armies         [2]Army
@@ -204,6 +223,7 @@ func GameFromArmies(white, black Army) Game {
 		board.ReplacePieces(ColorBlack, TypeQueen, TypeKing)
 	}
 	return Game{
+		flags:          VariantChess2,
 		board:          board,
 		castlingRights: castleKingside | castleQueenside,
 		armies:         [2]Army{white, black},
@@ -218,17 +238,21 @@ func (g *Game) GameState() GameState {
 }
 
 func (g *Game) updateGameState() {
-	if g.board.pieceMask(TypeKing) & ^whiteMidline == 0 {
+	useMidline := g.flags&GameFlagMidline != 0
+	if useMidline && g.board.pieceMask(TypeKing) & ^whiteMidline == 0 {
 		// White has won by moving all kings past the midline
 		g.gameState = GameOverWhite
-	} else if g.board.pieceMask(TypeKing) & ^blackMidline == 0 {
+	} else if useMidline && g.board.pieceMask(TypeKing) & ^blackMidline == 0 {
 		// Black has won by moving all kings past the midline
 		g.gameState = GameOverBlack
 	} else if g.halfmoveClock >= 50 {
 		// Draw via fifty move rule
 		g.gameState = GameOverDraw
 	} else if !g.hasLegalMoves() {
-		if g.toMove == ColorWhite {
+		if g.flags&GameFlagStalemate != 0 && !g.IsInCheck(g.toMove) {
+			// This is a stalemate
+			g.gameState = GameOverDraw
+		} else if g.toMove == ColorWhite {
 			g.gameState = GameOverBlack
 		} else {
 			g.gameState = GameOverWhite

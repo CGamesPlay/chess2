@@ -14,11 +14,13 @@ import (
 var (
 	maxDepth   int
 	bruteforce bool
+	classic    bool
 )
 
 func main() {
 	pflag.IntVarP(&maxDepth, "depth", "d", 2, "depth for perft")
 	pflag.BoolVarP(&bruteforce, "brute-force", "b", false, "use brute force search")
+	pflag.BoolVar(&classic, "classic", false, "use classic chess rules")
 	pflag.Parse()
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -61,7 +63,11 @@ func runPerft(input string) (string, error) {
 		}
 	}
 
-	game, err := chess2.ParseEpd(epd)
+	flags := chess2.VariantChess2
+	if classic {
+		flags = chess2.VariantClassic
+	}
+	game, err := chess2.ParseEpdFlags(epd, flags)
 	if err != nil {
 		return "", err
 	}

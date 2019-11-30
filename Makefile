@@ -8,7 +8,8 @@ test:
 
 .PHONY: perft
 perft:
-	cat test/perft.epd test/chess2_perft.epd | go run chess2/cmd/chess2_perft -d 3 >/dev/null
+	cat test/chess2_perft.epd | go run chess2/cmd/chess2_perft -d 3 >/dev/null
+	cat test/perft.epd | go run chess2/cmd/chess2_perft --classic -d 3 >/dev/null
 
 .PHONY: serve
 serve: install

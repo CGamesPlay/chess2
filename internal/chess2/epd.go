@@ -98,7 +98,23 @@ func EncodeEpd(game Game) string {
 
 // ParseEpd parses an EPD string and returns a Game object.
 func ParseEpd(epd string) (Game, error) {
-	game := Game{}
+	game, err := ParseEpdFlags(epd, VariantChess2)
+	return game, err
+}
+
+// ParseEpdClassic parses a classic Chess EPD string and returns a classic chess
+// Game object.
+func ParseEpdClassic(epd string) (Game, error) {
+	// Classic armies and 3 stones each to start.
+	epd = epd + " cc 33"
+	game, err := ParseEpdFlags(epd, VariantClassic)
+	return game, err
+}
+
+// ParseEpdFlags parses and EPD string and returns a game object. The flags on
+// the game can be adjusted.
+func ParseEpdFlags(epd string, flags GameFlags) (Game, error) {
+	game := Game{flags: flags}
 	// Split the EPD into components
 	var fenStr, castleStr, epStr string
 	var toMoveRune rune
