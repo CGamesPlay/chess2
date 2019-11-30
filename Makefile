@@ -7,8 +7,8 @@ test:
 	go test chess2/...
 
 .PHONY: perft
-perft: install
-	cat test/chess2_perft.epd | chess2_perft -d 3
+perft:
+	cat test/perft.epd test/chess2_perft.epd | go run chess2/cmd/chess2_perft -d 3 >/dev/null
 
 .PHONY: serve
 serve: install
