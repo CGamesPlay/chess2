@@ -1,7 +1,7 @@
 #!/bin/bash
 
 function test {
-  result=$(echo "$1" | chess2_json)
+  result=$(echo "$1" | $(go env GOBIN)/chess2_json)
   if [ "$result" != "$2" ]; then
     echo 'Test failed:' $1 >&2
     diff -u <(echo $2) <(echo $result) >&2

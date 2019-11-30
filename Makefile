@@ -10,9 +10,9 @@ test: install
 	./test/json_server.sh
 
 .PHONY: perft
-perft:
-	cat test/chess2_perft.epd | go run $(PKG)/cmd/chess2_perft -d 3 >/dev/null
-	cat test/perft.epd | go run $(PKG)/cmd/chess2_perft --classic -d 3 >/dev/null
+perft: install
+	cat test/chess2_perft.epd | `go env GOBIN`/chess2_perft -d 3 >/dev/null
+	cat test/perft.epd | `go env GOBIN`/chess2_perft --classic -d 3 >/dev/null
 
 .PHONY: serve
 serve: install
