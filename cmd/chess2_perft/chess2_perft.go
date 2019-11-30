@@ -2,11 +2,12 @@ package main
 
 import (
 	"bufio"
-	"chess2/internal/chess2"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/CGamesPlay/chess2/pkg/chess2"
 
 	"github.com/spf13/pflag"
 )

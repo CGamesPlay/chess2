@@ -1,5 +1,7 @@
 # Chess 2
 
+[![Documentation](https://godoc.org/github.com/CGamesPlay/chess2/pkg/chess2?status.svg)](https://godoc.org/github.com/CGamesPlay/chess2/pkg/chess2)
+
 Chess2 implemented in Go.
 
 To start a Chess 2 API server and hit it with a request:

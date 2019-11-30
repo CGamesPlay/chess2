@@ -1,10 +1,11 @@
 package main
 
 import (
-	"chess2/internal/chess2"
 	"fmt"
 	"net/http"
 	"sort"
+
+	"github.com/CGamesPlay/chess2/pkg/chess2"
 
 	"github.com/gin-gonic/gin"
 )

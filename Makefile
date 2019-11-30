@@ -1,15 +1,17 @@
+PKG=github.com/CGamesPlay/chess2
+
 .PHONY: install
 install:
-	go install chess2/...
+	go install $(PKG)/...
 
 .PHONY: test
 test:
-	go test chess2/...
+	go test $(PKG)/...
 
 .PHONY: perft
 perft:
-	cat test/chess2_perft.epd | go run chess2/cmd/chess2_perft -d 3 >/dev/null
-	cat test/perft.epd | go run chess2/cmd/chess2_perft --classic -d 3 >/dev/null
+	cat test/chess2_perft.epd | go run $(PKG)/cmd/chess2_perft -d 3 >/dev/null
+	cat test/perft.epd | go run $(PKG)/cmd/chess2_perft --classic -d 3 >/dev/null
 
 .PHONY: serve
 serve: install

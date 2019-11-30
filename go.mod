@@ -1,4 +1,4 @@
-module chess2
+module github.com/CGamesPlay/chess2
 
 go 1.13
 
