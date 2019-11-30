@@ -1,6 +1,28 @@
 package chess2
 
-var promotions = []PieceType{TypeNone, TypeQueen, TypeRook, TypeBishop, TypeKnight}
+var promotions = []PieceType{TypeQueen, TypeRook, TypeBishop, TypeKnight}
+
+// BruteforceMoveList calls the given function once for each possible move.
+// Drop moves are not emitted, but passes are.
+func BruteforceMoveList(send func(Move)) {
+	for from := uint8(0); from < 64; from++ {
+		for to := uint8(0); to < 64; to++ {
+			move := Move{
+				From: Square{Address: from},
+				To:   Square{Address: to},
+			}
+			send(move)
+			if move.To.Y() == 0 && move.From.Y() == 1 ||
+				move.To.Y() == 7 && move.From.Y() == 6 {
+				for _, promotion := range promotions {
+					move.Piece = NewPiece(promotion, ArmyNone, ColorWhite)
+					send(move)
+				}
+			}
+		}
+	}
+	send(MovePass)
+}
 
 // Perft returns the number of valid sequences of moves of length depth from the
 // given game. Challenges are never issued while counting moves.
@@ -25,23 +47,11 @@ func PerftBruteforce(game Game, depth int) []uint64 {
 	results := make([]uint64, depth)
 	doPerft(game, depth, results, func(g Game) []Move {
 		moves := make([]Move, 0, 64)
-		for from := uint8(0); from < 64; from++ {
-			for to := uint8(0); to < 64; to++ {
-				for _, promotion := range promotions {
-					candidate := Move{
-						From:  Square{Address: from},
-						To:    Square{Address: to},
-						Piece: NewPiece(promotion, ArmyNone, ColorWhite),
-					}
-					if err := g.ValidateLegalMove(candidate); err == nil {
-						moves = append(moves, candidate)
-					}
-				}
+		BruteforceMoveList(func(candidate Move) {
+			if err := g.ValidateLegalMove(candidate); err == nil {
+				moves = append(moves, candidate)
 			}
-		}
-		if err := g.ValidateLegalMove(MovePass); err == nil {
-			moves = append(moves, MovePass)
-		}
+		})
 		return moves
 	})
 	return results
