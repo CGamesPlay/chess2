@@ -232,9 +232,20 @@ func GameFromArmies(white, black Army) Game {
 	}
 }
 
+// ToMove returns the color who should make the next move.
+func (g *Game) ToMove() Color {
+	return g.toMove
+}
+
 // GameState returns the current state of the game.
 func (g *Game) GameState() GameState {
 	return g.gameState
+}
+
+// FullmoveNumber is the number of moves black has made, not counting
+// king-turns. This starts at 0 and becomes 1 on white's next regular turn.
+func (g *Game) FullmoveNumber() int {
+	return g.fullmoveNumber
 }
 
 func (g *Game) updateGameState() {

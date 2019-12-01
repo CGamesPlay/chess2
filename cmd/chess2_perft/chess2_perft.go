@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"runtime"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 
@@ -13,51 +15,82 @@ import (
 )
 
 var (
-	maxDepth   int
-	bruteforce bool
-	classic    bool
-	divide     bool
+	maxDepth   = pflag.IntP("depth", "d", 2, "depth for perft")
+	bruteforce = pflag.BoolP("brute-force", "b", false, "use brute force search")
+	classic    = pflag.Bool("classic", false, "use classic chess rules")
+	divide     = pflag.Bool("divide", false, "split results for first move")
+	cpuProfile = pflag.String("cpu-profile", "", "filename for CPU profile")
+	memProfile = pflag.String("mem-profile", "", "filename for memory profile")
 )
 
 func main() {
-	pflag.IntVarP(&maxDepth, "depth", "d", 2, "depth for perft")
-	pflag.BoolVarP(&bruteforce, "brute-force", "b", false, "use brute force search")
-	pflag.BoolVar(&classic, "classic", false, "use classic chess rules")
-	pflag.BoolVar(&divide, "divide", false, "split results for first move")
 	pflag.Parse()
 
+	if *cpuProfile != "" {
+		f, err := os.Create(*cpuProfile)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "could not create CPU profile: ", err)
+			os.Exit(2)
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			fmt.Fprintln(os.Stderr, "could not start CPU profile: ", err)
+			os.Exit(2)
+		}
+		defer pprof.StopCPUProfile()
+	}
+
+	success := handleInput()
+	if !success {
+		os.Exit(1)
+	}
+
+	if *memProfile != "" {
+		f, err := os.Create(*memProfile)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "could not create memory profile: ", err)
+			os.Exit(2)
+		}
+		defer f.Close()
+		runtime.GC() // get up-to-date statistics
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			fmt.Fprintln(os.Stderr, "could not write memory profile: ", err)
+			os.Exit(2)
+		}
+	}
+}
+
+func handleInput() bool {
 	scanner := bufio.NewScanner(os.Stdin)
-	failed := false
+	success := true
 	for scanner.Scan() {
 		epd := scanner.Text()
 		var result string
 		var err error
-		if divide {
+		if *divide {
 			result, err = dividePerft(epd)
 		} else {
 			result, err = runPerft(epd)
 		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v (epd: %s)\n", err, epd)
-			failed = true
+			success = false
 		} else {
 			fmt.Println(result)
 		}
-	}
-	if failed {
-		os.Exit(1)
 	}
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintf(os.Stderr, "error reading: %v\n", err)
 		os.Exit(2)
 	}
+	return success
 }
 
 // Parse the epd according to the configured parameters.
 func parseEpd(epd string) (chess2.Game, error) {
 	flags := chess2.VariantChess2
 	usedEpd := epd
-	if classic {
+	if *classic {
 		flags = chess2.VariantClassic
 		usedEpd += " cc 33"
 	}
@@ -75,12 +108,12 @@ func dividePerft(epd string) (string, error) {
 	var sb strings.Builder
 	sb.WriteString(strings.TrimSpace(epd))
 	sb.WriteRune('\n')
-	if maxDepth < 1 {
+	if *maxDepth < 1 {
 		return sb.String(), nil
 	}
 
 	var moves []chess2.Move
-	if bruteforce {
+	if *bruteforce {
 		chess2.BruteforceMoveList(func(m chess2.Move) {
 			if err := game.ValidateLegalMove(m); err == nil {
 				moves = append(moves, m)
@@ -91,15 +124,15 @@ func dividePerft(epd string) (string, error) {
 	}
 
 	for _, m := range moves {
-		if maxDepth > 1 {
+		if *maxDepth > 1 {
 			child := game.ApplyMove(m)
 			var results []uint64
-			if bruteforce {
-				results = chess2.PerftBruteforce(child, maxDepth-1)
+			if *bruteforce {
+				results = chess2.PerftBruteforce(child, *maxDepth-1)
 			} else {
-				results = chess2.Perft(child, maxDepth-1)
+				results = chess2.Perft(child, *maxDepth-1)
 			}
-			sb.WriteString(fmt.Sprintf("%v: %d\n", m, results[maxDepth-2]))
+			sb.WriteString(fmt.Sprintf("%v: %d\n", m, results[*maxDepth-2]))
 		} else {
 			sb.WriteString(fmt.Sprintf("%v: 1\n", m))
 		}
@@ -131,12 +164,12 @@ func runPerft(input string) (string, error) {
 		return "", err
 	}
 	var result []uint64
-	if bruteforce {
-		result = chess2.PerftBruteforce(game, maxDepth)
+	if *bruteforce {
+		result = chess2.PerftBruteforce(game, *maxDepth)
 	} else {
-		result = chess2.Perft(game, maxDepth)
+		result = chess2.Perft(game, *maxDepth)
 	}
-	for i := 0; i < len(checkValues) && i < maxDepth; i++ {
+	for i := 0; i < len(checkValues) && i < *maxDepth; i++ {
 		if checkValues[i] != result[i] {
 			return "", fmt.Errorf("expected %d, found %d at depth %d", checkValues[i], result[i], i+1)
 		}
