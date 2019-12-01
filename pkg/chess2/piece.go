@@ -230,10 +230,17 @@ func (p Piece) Army() Army {
 // Name returns one of the PieceName* constants. It's a combination of the Army
 // and Type, but pieces which aren't special are converted to ArmyBasic.
 func (p Piece) Name() PieceName {
-	if _, found := pieceNames[PieceName(p.repr&^colorMask)]; found {
-		return PieceName(p.repr &^ colorMask)
+	name := PieceName(p.repr &^ colorMask)
+	switch name {
+	case PieceNameClassicKing, PieceNameNemesisQueen, PieceNameNemesisPawn,
+		PieceNameEmpoweredQueen, PieceNameEmpoweredBishop,
+		PieceNameEmpoweredKnight, PieceNameEmpoweredRook, PieceNameReaperQueen,
+		PieceNameReaperRook, PieceNameTwoKingsKing, PieceNameAnimalsQueen,
+		PieceNameAnimalsBishop, PieceNameAnimalsKnight, PieceNameAnimalsRook:
+		return name
+	default:
+		return PieceName(p.repr & typeMask)
 	}
-	return PieceName(p.repr & typeMask)
 }
 
 // Color returns the piece color of the receiver.
