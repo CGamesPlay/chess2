@@ -109,10 +109,10 @@ type Board struct {
 // boolean indicating whether the square is occupied. The returned piece will
 // always have ArmyNone as the Army.
 func (b *Board) PieceAt(s Square) (Piece, bool) {
-	squareMask := s.mask()
 	var (
-		color     Color
-		pieceType PieceType
+		squareMask uint64 = s.mask()
+		color      Color
+		pieceType  PieceType
 	)
 	if (b.colors[0]|b.colors[1])&squareMask == 0 {
 		return Piece{}, false
