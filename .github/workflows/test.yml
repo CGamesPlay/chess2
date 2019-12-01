@@ -13,4 +13,9 @@ jobs:
       with:
         go-version: '1.13'
     - name: Run tests
-      run: make test perft
+      run: |
+        export GOPATH=$HOME/go
+        export GOBIN=$(go env GOPATH)/bin
+        export PATH=$PATH:$GOPATH
+        export PATH=$PATH:$GOBIN
+        make test perft
