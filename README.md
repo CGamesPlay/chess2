@@ -44,5 +44,5 @@ Here are the timings for `chess2_perft` at depth 3.
 | Configuration          | Speed  | Relative |
 | ---------------------- | ------ | -------- |
 | Python engine          | 636.73 | 1.00000  |
-| Go engine, brute force | 21.20  | 0.03330  |
-| Go engine, fast        | 3.92   | 0.00616  |
+| Go engine, brute force | 6.62   | 0.01040  |
+| Go engine, fast        | 2.45   | 0.00385  |
