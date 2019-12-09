@@ -46,9 +46,11 @@ func TestUpdateGameStatus(t *testing.T) {
 		},
 	}
 	for name, config := range cases {
-		game, err := ParseEpd(config.epd)
-		require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
-		assert.Equal(t, game.GameState(), config.state, "Case: %s", name)
+		t.Run(name, func(t *testing.T) {
+			game, err := ParseEpd(config.epd)
+			require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
+			assert.Equal(t, game.GameState(), config.state, "Case: %s", name)
+		})
 	}
 }
 
@@ -57,38 +59,14 @@ func TestSingleStepMask(t *testing.T) {
 		pair    string
 		squares []string
 	}{
-		{
-			pair:    "b5d5",
-			squares: []string{"c5"},
-		},
-		{
-			pair:    "b3d5",
-			squares: []string{"b4", "c4", "c3"},
-		},
-		{
-			pair:    "d3d5",
-			squares: []string{"d4"},
-		},
-		{
-			pair:    "f3d5",
-			squares: []string{"e4", "f4", "e3"},
-		},
-		{
-			pair:    "f5d5",
-			squares: []string{"e5"},
-		},
-		{
-			pair:    "f7d5",
-			squares: []string{"e7", "e6", "f6"},
-		},
-		{
-			pair:    "d7d5",
-			squares: []string{"d6"},
-		},
-		{
-			pair:    "b7d5",
-			squares: []string{"c7", "b6", "c6"},
-		},
+		{pair: "b5d5", squares: []string{"c5"}},
+		{pair: "b3d5", squares: []string{"b4", "c4", "c3"}},
+		{pair: "d3d5", squares: []string{"d4"}},
+		{pair: "f3d5", squares: []string{"e4", "f4", "e3"}},
+		{pair: "f5d5", squares: []string{"e5"}},
+		{pair: "f7d5", squares: []string{"e7", "e6", "f6"}},
+		{pair: "d7d5", squares: []string{"d6"}},
+		{pair: "b7d5", squares: []string{"c7", "b6", "c6"}},
 	}
 	for _, config := range cases {
 		move, err := ParseUci(config.pair)
@@ -243,21 +221,23 @@ func TestAttackMask(t *testing.T) {
 		},
 	}
 	for name, config := range cases {
-		game, err := ParseEpd(config.epd)
-		require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
-		fromMask := maskFull
-		if config.concern != "" {
-			fromMask = SquareFromName(config.concern).mask()
-		}
-		mask := uint64(0)
-		eachSquareInMask(fromMask, func(from Square) {
-			mask |= game.attackMask(from)
+		t.Run(name, func(t *testing.T) {
+			game, err := ParseEpd(config.epd)
+			require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
+			fromMask := maskFull
+			if config.concern != "" {
+				fromMask = SquareFromName(config.concern).mask()
+			}
+			mask := uint64(0)
+			eachSquareInMask(fromMask, func(from Square) {
+				mask |= game.attackMask(from)
+			})
+			sqNames := make([]string, 0, 64)
+			eachSquareInMask(mask, func(to Square) {
+				sqNames = append(sqNames, to.String())
+			})
+			assert.Equal(t, config.squares, sqNames, "EPD: %s  Name: %s", config.epd, name)
 		})
-		sqNames := make([]string, 0, 64)
-		eachSquareInMask(mask, func(to Square) {
-			sqNames = append(sqNames, to.String())
-		})
-		assert.Equal(t, config.squares, sqNames, "EPD: %s  Name: %s", config.epd, name)
 	}
 }
 
@@ -291,16 +271,15 @@ func TestIsInCheck(t *testing.T) {
 		},
 	}
 	for name, config := range cases {
-		if name == "rampage would kill own king" {
-			if testing.Verbose() {
-				t.Logf("skipping case %s\n", name)
+		t.Run(name, func(t *testing.T) {
+			if name == "rampage would kill own king" {
+				t.Skip()
 			}
-			continue
-		}
-		game, err := ParseEpd(config.epd)
-		require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
-		inCheck := game.IsInCheck(config.color)
-		assert.Equal(t, inCheck, config.inCheck, "Case: %s", name)
+			game, err := ParseEpd(config.epd)
+			require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
+			inCheck := game.IsInCheck(config.color)
+			assert.Equal(t, inCheck, config.inCheck, "Case: %s", name)
+		})
 	}
 }
 
@@ -552,16 +531,18 @@ func TestValidatePseudoLegalMove(t *testing.T) {
 		},
 	}
 	for name, config := range cases {
-		game, err := ParseEpd(config.epd)
-		require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
-		move, err := ParseUci(config.move)
-		require.NoError(t, err, "Move: %s  Name: %s", config.move, name)
-		err = game.ValidatePseudoLegalMove(move)
-		if config.err != nil {
-			assert.EqualError(t, err, config.err.Error(), "Case: %s", name)
-		} else {
-			assert.NoError(t, err, "Case: %s", name)
-		}
+		t.Run(name, func(t *testing.T) {
+			game, err := ParseEpd(config.epd)
+			require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
+			move, err := ParseUci(config.move)
+			require.NoError(t, err, "Move: %s  Name: %s", config.move, name)
+			err = game.ValidatePseudoLegalMove(move)
+			if config.err != nil {
+				assert.EqualError(t, err, config.err.Error(), "Case: %s", name)
+			} else {
+				assert.NoError(t, err, "Case: %s", name)
+			}
+		})
 	}
 }
 
@@ -584,16 +565,18 @@ func TestValidateLegalMove(t *testing.T) {
 		},
 	}
 	for name, config := range cases {
-		game, err := ParseEpd(config.epd)
-		require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
-		move, err := ParseUci(config.move)
-		require.NoError(t, err, "Move: %s  Name: %s", config.move, name)
-		err = game.ValidateLegalMove(move)
-		if config.err != nil {
-			assert.EqualError(t, err, config.err.Error(), "Case: %s", name)
-		} else {
-			assert.NoError(t, err, "Case: %s", name)
-		}
+		t.Run(name, func(t *testing.T) {
+			game, err := ParseEpd(config.epd)
+			require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
+			move, err := ParseUci(config.move)
+			require.NoError(t, err, "Move: %s  Name: %s", config.move, name)
+			err = game.ValidateLegalMove(move)
+			if config.err != nil {
+				assert.EqualError(t, err, config.err.Error(), "Case: %s", name)
+			} else {
+				assert.NoError(t, err, "Case: %s", name)
+			}
+		})
 	}
 }
 
@@ -635,16 +618,18 @@ func TestValidateDuels(t *testing.T) {
 		},
 	}
 	for name, config := range cases {
-		game, err := ParseEpd(config.epd)
-		require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
-		move, err := ParseUci(config.move)
-		require.NoError(t, err, "Move: %s  Name: %s", config.move, name)
-		err = game.ValidateDuels(move)
-		if config.err != nil {
-			assert.EqualError(t, err, config.err.Error(), "Case: %s", name)
-		} else {
-			assert.NoError(t, err, "Case: %s", name)
-		}
+		t.Run(name, func(t *testing.T) {
+			game, err := ParseEpd(config.epd)
+			require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
+			move, err := ParseUci(config.move)
+			require.NoError(t, err, "Move: %s  Name: %s", config.move, name)
+			err = game.ValidateDuels(move)
+			if config.err != nil {
+				assert.EqualError(t, err, config.err.Error(), "Case: %s", name)
+			} else {
+				assert.NoError(t, err, "Case: %s", name)
+			}
+		})
 	}
 }
 
@@ -796,13 +781,15 @@ func TestApplyMove(t *testing.T) {
 		},
 	}
 	for name, config := range cases {
-		before, err := ParseEpd(config.before)
-		require.NoError(t, err, "EPD: %s  Name: %s", config.before, name)
-		move, err := ParseUci(config.move)
-		require.NoError(t, err, "Move: %s  Name: %s", config.move, name)
-		after := before.ApplyMove(move)
-		result := EncodeEpd(after)
-		assert.Equal(t, config.after, result, "Case: %s", name)
+		t.Run(name, func(t *testing.T) {
+			before, err := ParseEpd(config.before)
+			require.NoError(t, err, "EPD: %s  Name: %s", config.before, name)
+			move, err := ParseUci(config.move)
+			require.NoError(t, err, "Move: %s  Name: %s", config.move, name)
+			after := before.ApplyMove(move)
+			result := EncodeEpd(after)
+			assert.Equal(t, config.after, result, "Case: %s", name)
+		})
 	}
 }
 
@@ -850,15 +837,17 @@ func TestGenerateDuels(t *testing.T) {
 		},
 	}
 	for name, config := range cases {
-		game, err := ParseEpd(config.epd)
-		require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
-		move, err := ParseUci(config.move)
-		require.NoError(t, err, "Move: %s  Name: %s", config.move, name)
-		duels := game.GenerateDuels(move)
-		duelsStr := make([]string, len(duels))
-		for i := 0; i < len(duels); i++ {
-			duelsStr[i] = duels[i].String()[4:]
-		}
-		assert.Equal(t, duelsStr, config.duels, "Case: %s", name)
+		t.Run(name, func(t *testing.T) {
+			game, err := ParseEpd(config.epd)
+			require.NoError(t, err, "EPD: %s  Name: %s", config.epd, name)
+			move, err := ParseUci(config.move)
+			require.NoError(t, err, "Move: %s  Name: %s", config.move, name)
+			duels := game.GenerateDuels(move)
+			duelsStr := make([]string, len(duels))
+			for i := 0; i < len(duels); i++ {
+				duelsStr[i] = duels[i].String()[4:]
+			}
+			assert.Equal(t, duelsStr, config.duels, "Case: %s", name)
+		})
 	}
 }
