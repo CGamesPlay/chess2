@@ -366,7 +366,7 @@ func TestValidatePseudoLegalMove(t *testing.T) {
 			epd:  "4k3/8/8/8/8/8/8/3qK3 w - - 0 1 cn 33",
 			move: "e1d1",
 		},
-		"illegal capture of reaper rook": {
+		"illegal capture of ghost": {
 			epd:  "4k3/8/8/8/8/8/8/3rK3 w - - 0 1 cr 33",
 			move: "e1d1",
 			err:  IllegalCaptureError,
@@ -515,10 +515,19 @@ func TestValidatePseudoLegalMove(t *testing.T) {
 			move: "c2c3",
 			err:  IllegalRampageError,
 		},
+		"rampage stops at ghost": {
+			epd:  "4k3/8/8/8/8/1Rpr4/8/4K3 w - - 0 1 ar 33",
+			move: "b3c3",
+		},
+		"rampage captures ghost": {
+			epd:  "4k3/8/8/8/8/1Rpr4/8/4K3 w - - 0 1 ar 33",
+			move: "b3e3",
+			err:  IllegalCaptureError,
+		},
 		"rampage kills own king": {
 			epd:  "4k3/8/8/8/8/8/8/4K2R w K - 0 1 ac 33",
 			move: "h1e1",
-			err:  IllegalRampageError,
+			err:  IllegalCaptureError,
 		},
 		"illegal elephant capture": {
 			epd:  "4k3/8/8/8/Rn6/8/8/4K3 w KQkq - 0 1 ac 33",

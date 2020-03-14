@@ -830,7 +830,7 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 		// These pieces attack each square they pass through
 		visitedSquares |= betweenMask[move.From.Address][move.To.Address]
 	}
-	if piece.Name() != PieceNameAnimalsRook && visitedSquares&noncapturableMask != 0 {
+	if visitedSquares&noncapturableMask != 0 {
 		return IllegalCaptureError
 	}
 
@@ -867,7 +867,7 @@ func (g *Game) ValidatePseudoLegalMove(move Move) error {
 		}
 		if visitedSquares&g.board.colorMask(piece.Color())&g.board.pieceMask(TypeKing) != 0 {
 			// Cannot capture own king
-			return IllegalRampageError
+			return IllegalCaptureError
 		}
 	}
 
